@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { formatCurrency, formatDate, initialsOf } from "@/lib/format";
+import { isStudentRole } from "@/lib/auth";
 import { AssignDialog } from "../assign-dialog";
 import { PaymentDetail } from "../../payments/payment-detail";
 import {
@@ -47,7 +48,7 @@ export default async function StudentDetailPage({
   const { userId } = await params;
 
   const [me] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!me || me.role !== "student") notFound();
+  if (!me || !isStudentRole(me.role)) notFound();
 
   const [studentRows, sessionRows, assignmentRows, paymentRows, enrollmentRows, programOptions] =
     await Promise.all([

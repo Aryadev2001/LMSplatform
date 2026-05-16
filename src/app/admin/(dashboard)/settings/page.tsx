@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { requireRole, getCurrentUser } from "@/lib/auth";
+import { requireRole, getCurrentUser, ADMIN_DB_ROLES } from "@/lib/auth";
 import { PERMISSION_LABELS, type AdminPermission, hasPermission } from "@/lib/permissions";
 import { initialsOf, formatDate } from "@/lib/format";
 import { AddAdminDialog } from "./add-admin-dialog";
@@ -39,7 +39,7 @@ export default async function AdminSettingsPage() {
         createdAt: users.createdAt,
       })
       .from(users)
-      .where(eq(users.role, "admin"))
+      .where(inArray(users.role, [...ADMIN_DB_ROLES]))
       .orderBy(desc(users.isSuperAdmin), desc(users.createdAt)),
     me
       ? db

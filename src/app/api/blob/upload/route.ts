@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isAdminRole } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
-  if (!dbUser || dbUser.role !== "admin") {
+  if (!dbUser || !isAdminRole(dbUser.role)) {
     return fail("This account is not an admin — uploads are admin-only.", 403);
   }
 

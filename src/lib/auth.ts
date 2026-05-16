@@ -24,6 +24,24 @@ export type SuperRole = "SUPER_OWNER" | "SUPER_STAFF" | "SUPER_SUPPORT";
 
 const SUPER_ROLES: RawRole[] = ["SUPER_OWNER", "SUPER_STAFF", "SUPER_SUPPORT"];
 
+/**
+ * DB role-value groups. The phase-7 backfill remapped legacy lowercase
+ * (admin/student/coach) → UPPERCASE (TENANT_ADMIN/STUDENT). Some rows created
+ * before standardization may still be lowercase, so every role *filter* must
+ * accept BOTH vocabularies. New writes use the canonical UPPERCASE value.
+ */
+export const ADMIN_DB_ROLES = ["admin", "TENANT_ADMIN"] as const;
+export const STUDENT_DB_ROLES = ["student", "STUDENT", "coach"] as const;
+export const CANONICAL_ADMIN: RawRole = "TENANT_ADMIN";
+export const CANONICAL_STUDENT: RawRole = "STUDENT";
+
+export function isAdminRole(role: string | null | undefined) {
+  return role === "admin" || role === "TENANT_ADMIN";
+}
+export function isStudentRole(role: string | null | undefined) {
+  return role === "student" || role === "STUDENT" || role === "coach";
+}
+
 /** Map any raw DB role to the normalized role the existing app reasons about. */
 export function normalizeRole(raw: RawRole | null | undefined): UserRole | null {
   if (!raw) return null;

@@ -6,7 +6,7 @@ import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { requireRole, getCurrentUser } from "@/lib/auth";
+import { requireRole, getCurrentUser, CANONICAL_ADMIN } from "@/lib/auth";
 import { ADMIN_PERMISSIONS, type AdminPermission } from "@/lib/permissions";
 
 async function requireManageAdmins() {
@@ -51,7 +51,7 @@ export async function addAdmin(input: z.infer<typeof AddAdminSchema>): Promise<A
   if (clerkUser) {
     // Promote existing user
     await clerk.users.updateUserMetadata(clerkUser.id, {
-      publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: "admin" },
+      publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: CANONICAL_ADMIN },
     });
     const dbRow = await db.select().from(users).where(eq(users.clerkId, clerkUser.id)).limit(1);
     if (dbRow.length === 0) {
@@ -59,14 +59,14 @@ export async function addAdmin(input: z.infer<typeof AddAdminSchema>): Promise<A
         clerkId: clerkUser.id,
         email,
         fullName: fullName || null,
-        role: "admin",
+        role: CANONICAL_ADMIN,
         isSuperAdmin: false,
         permissions,
       });
     } else {
       await db
         .update(users)
-        .set({ role: "admin", isSuperAdmin: false, permissions, updatedAt: new Date() })
+        .set({ role: CANONICAL_ADMIN, isSuperAdmin: false, permissions, updatedAt: new Date() })
         .where(eq(users.clerkId, clerkUser.id));
     }
   } else {
@@ -75,7 +75,7 @@ export async function addAdmin(input: z.infer<typeof AddAdminSchema>): Promise<A
       await clerk.invitations.createInvitation({
         emailAddress: email,
         redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/admin`,
-        publicMetadata: { role: "admin", invitedPermissions: permissions },
+        publicMetadata: { role: CANONICAL_ADMIN, invitedPermissions: permissions },
         notify: true,
       });
     } catch (err) {

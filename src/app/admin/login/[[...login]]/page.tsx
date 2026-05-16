@@ -39,8 +39,8 @@ export default function AdminLoginPage() {
             <SignIn
               routing="path"
               path="/admin/login"
-              forceRedirectUrl="/admin"
-              fallbackRedirectUrl="/admin"
+              forceRedirectUrl="/post-login"
+              fallbackRedirectUrl="/post-login"
             />
           </div>
         </div>

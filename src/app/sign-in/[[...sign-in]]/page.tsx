@@ -8,13 +8,14 @@ export default function SignInPage() {
       title="Welcome back"
       description="Sign in to your EDT learning dashboard with magic link."
     >
-      {/* Student portal is fully separate from admin — always lands on /student */}
+      {/* Route by role: /post-login sends each user to their own dashboard,
+          so an admin who lands here is never trapped in the student app. */}
       <SignIn
         routing="path"
         path="/sign-in"
         signUpUrl="/sign-up"
-        forceRedirectUrl="/student"
-        fallbackRedirectUrl="/student"
+        forceRedirectUrl="/post-login"
+        fallbackRedirectUrl="/post-login"
       />
     </AuthShell>
   );

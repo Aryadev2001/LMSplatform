@@ -37,7 +37,7 @@ export default async function AdminOverviewPage() {
     await Promise.all([
       db
         .select({
-          students: sql<number>`count(*) filter (where role = 'student')::int`,
+          students: sql<number>`count(*) filter (where role in ('student','STUDENT','coach'))::int`,
         })
         .from(users),
       db

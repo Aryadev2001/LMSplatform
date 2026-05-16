@@ -5,6 +5,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/db/client";
 import { enrollments, programs, payments, users, students } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { CANONICAL_STUDENT } from "@/lib/auth";
 
 const EnrollmentSchema = z.object({
   fullName: z.string().min(2, "Please enter your full name").max(200),
@@ -112,13 +113,13 @@ export async function completeMockPayment(enrollmentId: string): Promise<Payment
         emailAddress: [email],
         firstName: enr.fullName?.split(" ")[0],
         lastName: enr.fullName?.split(" ").slice(1).join(" ") || undefined,
-        publicMetadata: { role: "student", enrollmentId },
+        publicMetadata: { role: CANONICAL_STUDENT, enrollmentId },
         skipPasswordRequirement: true,
         skipPasswordChecks: true,
       });
     } else {
       await clerk.users.updateUserMetadata(clerkUser.id, {
-        publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: "student", enrollmentId },
+        publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: CANONICAL_STUDENT, enrollmentId },
       });
     }
   } catch (err) {
@@ -143,7 +144,7 @@ export async function completeMockPayment(enrollmentId: string): Promise<Payment
         clerkId: clerkUser.id,
         email,
         fullName: enr.fullName,
-        role: "student",
+        role: CANONICAL_STUDENT,
       })
       .returning({ id: users.id });
     userId = row.id;
@@ -151,7 +152,7 @@ export async function completeMockPayment(enrollmentId: string): Promise<Payment
     userId = dbUser.id;
     await db
       .update(users)
-      .set({ role: "student", updatedAt: new Date() })
+      .set({ role: CANONICAL_STUDENT, updatedAt: new Date() })
       .where(eq(users.id, userId));
   }
 

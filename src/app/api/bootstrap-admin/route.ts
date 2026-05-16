@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { isAllowedToBootstrap } from "@/lib/admin-allowlist";
+import { CANONICAL_ADMIN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
       const invitation = await clerk.invitations.createInvitation({
         emailAddress: email,
         redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/admin`,
-        publicMetadata: { role: "admin" },
+        publicMetadata: { role: CANONICAL_ADMIN },
         notify: true,
       });
       return NextResponse.json({
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
 
   // CASE B — Clerk user exists: just promote them
   await clerk.users.updateUserMetadata(clerkUser.id, {
-    publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: "admin" },
+    publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: CANONICAL_ADMIN },
   });
 
   const primaryEmail =
@@ -91,12 +92,12 @@ export async function POST(req: Request) {
       email: primaryEmail,
       fullName,
       avatarUrl: clerkUser.imageUrl,
-      role: "admin",
+      role: CANONICAL_ADMIN,
     });
   } else {
     await db
       .update(users)
-      .set({ role: "admin", updatedAt: new Date() })
+      .set({ role: CANONICAL_ADMIN, updatedAt: new Date() })
       .where(eq(users.clerkId, clerkUser.id));
   }
 
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
     invited: false,
     clerkUserId: clerkUser.id,
     email: primaryEmail,
-    role: "admin",
+    role: CANONICAL_ADMIN,
     message:
       "Admin role assigned. Sign out and sign back in via /admin/login to load the new role.",
   });

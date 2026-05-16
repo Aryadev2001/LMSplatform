@@ -4,6 +4,13 @@ import { headers } from "next/headers";
 import { db } from "@/db/client";
 import { users, students, enrollments } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import {
+  isAdminRole,
+  isStudentRole,
+  CANONICAL_ADMIN,
+  CANONICAL_STUDENT,
+  type RawRole,
+} from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -65,10 +72,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No email on user" }, { status: 400 });
   }
 
-  const role = data.public_metadata?.role ?? "student";
+  // Normalize incoming Clerk metadata role to a canonical DB role. Legacy
+  // lowercase (admin/student/coach) → UPPERCASE; super/instructor pass through.
+  const rawMetaRole = (data.public_metadata?.role as string | undefined) ?? "student";
+  const role: RawRole = isAdminRole(rawMetaRole)
+    ? CANONICAL_ADMIN
+    : isStudentRole(rawMetaRole)
+      ? CANONICAL_STUDENT
+      : (rawMetaRole as RawRole);
+  const isAdmin = isAdminRole(role);
+  const isStudent = isStudentRole(role);
   const fullName = [data.first_name, data.last_name].filter(Boolean).join(" ").trim() || null;
-  const invitedPermissions =
-    role === "admin" ? (data.public_metadata?.invitedPermissions ?? []) : [];
+  const invitedPermissions = isAdmin ? (data.public_metadata?.invitedPermissions ?? []) : [];
 
   // Upsert users row
   const existing = await db.select().from(users).where(eq(users.clerkId, data.id)).limit(1);
@@ -95,7 +110,7 @@ export async function POST(req: Request) {
         fullName,
         avatarUrl: data.image_url ?? null,
         role,
-        ...(role === "admin" && invitedPermissions.length > 0
+        ...(isAdmin && invitedPermissions.length > 0
           ? { permissions: invitedPermissions }
           : {}),
         updatedAt: new Date(),
@@ -104,7 +119,7 @@ export async function POST(req: Request) {
   }
 
   // If they're a student, create the student row (idempotent) + link enrollment
-  if (role === "student") {
+  if (isStudent) {
     const enrollmentId = data.public_metadata?.enrollmentId;
     const existingStudent = await db
       .select()

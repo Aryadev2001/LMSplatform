@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { db } from "@/db/client";
 import { users, students, programs } from "@/db/schema";
-import { eq, and, or, ilike } from "drizzle-orm";
+import { eq, and, or, ilike, inArray } from "drizzle-orm";
+import { STUDENT_DB_ROLES } from "@/lib/auth";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { Card } from "@/components/ui/card";
@@ -29,10 +30,10 @@ export default async function AdminStudentsPage({
   const search = q?.trim();
   const studentWhere = search
     ? and(
-        eq(users.role, "student"),
+        inArray(users.role, [...STUDENT_DB_ROLES]),
         or(ilike(users.fullName, `%${search}%`), ilike(users.email, `%${search}%`)),
       )
-    : eq(users.role, "student");
+    : inArray(users.role, [...STUDENT_DB_ROLES]);
 
   const [studentRows, programOptions] = await Promise.all([
     db

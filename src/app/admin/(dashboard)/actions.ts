@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { programs, students, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth";
+import { requireRole, isStudentRole } from "@/lib/auth";
 
 // ---------- Program CRUD ----------
 const ProgramSchema = z.object({
@@ -90,7 +90,7 @@ export async function assignStudent(input: z.infer<typeof AssignSchema>) {
     .from(users)
     .where(eq(users.id, parsed.data.studentUserId))
     .limit(1);
-  if (existing.length === 0 || existing[0].role !== "student") {
+  if (existing.length === 0 || !isStudentRole(existing[0].role)) {
     return { success: false as const, error: "Student not found" };
   }
 
