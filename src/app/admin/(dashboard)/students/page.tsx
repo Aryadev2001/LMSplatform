@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { users, students, programs } from "@/db/schema";
 import { eq, and, or, ilike, inArray } from "drizzle-orm";
 import { STUDENT_DB_ROLES } from "@/lib/auth";
+import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { Card } from "@/components/ui/card";
@@ -27,13 +28,18 @@ export default async function AdminStudentsPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
+  const tenantId = await requireTenantId();
   const search = q?.trim();
   const studentWhere = search
     ? and(
+        eq(users.tenantId, tenantId),
         inArray(users.role, [...STUDENT_DB_ROLES]),
         or(ilike(users.fullName, `%${search}%`), ilike(users.email, `%${search}%`)),
       )
-    : inArray(users.role, [...STUDENT_DB_ROLES]);
+    : and(
+        eq(users.tenantId, tenantId),
+        inArray(users.role, [...STUDENT_DB_ROLES]),
+      );
 
   const [studentRows, programOptions] = await Promise.all([
     db
@@ -53,7 +59,8 @@ export default async function AdminStudentsPage({
       .orderBy(users.createdAt),
     db
       .select({ id: programs.id, name: programs.name, isActive: programs.isActive })
-      .from(programs),
+      .from(programs)
+      .where(eq(programs.tenantId, tenantId)),
   ]);
 
   const activePrograms = programOptions.filter((p) => p.isActive);

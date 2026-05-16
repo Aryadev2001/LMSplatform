@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
 import { programs, modules, lessons } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 
 export async function getCourseBySlug(slug: string) {
   const [course] = await db
@@ -16,10 +16,14 @@ export async function getCourseBySlug(slug: string) {
     .where(eq(modules.courseId, course.id))
     .orderBy(asc(modules.orderIndex));
 
-  const allLessons = await db
-    .select()
-    .from(lessons)
-    .orderBy(asc(lessons.orderIndex));
+  const moduleIds = mods.map((m) => m.id);
+  const allLessons = moduleIds.length
+    ? await db
+        .select()
+        .from(lessons)
+        .where(inArray(lessons.moduleId, moduleIds))
+        .orderBy(asc(lessons.orderIndex))
+    : [];
 
   const modulesWithLessons = mods.map((mod) => ({
     ...mod,

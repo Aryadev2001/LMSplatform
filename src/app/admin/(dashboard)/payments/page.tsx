@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { payments, enrollments, users } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
+import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -32,6 +33,7 @@ export default async function AdminPaymentsPage({
   searchParams: Promise<{ status?: string; q?: string }>;
 }) {
   const { status, q } = await searchParams;
+  const tenantId = await requireTenantId();
   const search = q?.trim()?.toLowerCase();
   const activeFilter: StatusFilter = (STATUS_FILTERS as readonly string[]).includes(status ?? "")
     ? (status as StatusFilter)
@@ -45,7 +47,8 @@ export default async function AdminPaymentsPage({
         pendingCount: sql<number>`count(*) filter (where status = 'pending')::int`,
         total: sql<number>`count(*)::int`,
       })
-      .from(payments),
+      .from(payments)
+      .where(eq(payments.tenantId, tenantId)),
     db
       .select({
         id: payments.id,
@@ -68,6 +71,7 @@ export default async function AdminPaymentsPage({
       .from(payments)
       .leftJoin(enrollments, eq(payments.enrollmentId, enrollments.id))
       .leftJoin(users, eq(payments.studentUserId, users.id))
+      .where(eq(payments.tenantId, tenantId))
       .orderBy(desc(payments.createdAt)),
   ]);
 

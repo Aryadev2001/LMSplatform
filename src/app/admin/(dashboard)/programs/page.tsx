@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { db } from "@/db/client";
 import { programs } from "@/db/schema";
-import { desc, ilike } from "drizzle-orm";
+import { and, eq, desc, ilike } from "drizzle-orm";
+import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { Card } from "@/components/ui/card";
@@ -25,11 +26,16 @@ export default async function AdminProgramsPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
+  const tenantId = await requireTenantId();
   const search = q?.trim();
   const rows = await db
     .select()
     .from(programs)
-    .where(search ? ilike(programs.name, `%${search}%`) : undefined)
+    .where(
+      search
+        ? and(eq(programs.tenantId, tenantId), ilike(programs.name, `%${search}%`))
+        : eq(programs.tenantId, tenantId),
+    )
     .orderBy(desc(programs.createdAt));
 
   return (

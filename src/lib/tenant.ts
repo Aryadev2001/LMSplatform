@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { tenants } from "@/db/schema";
@@ -190,4 +191,17 @@ export async function requireTenant(): Promise<ResolvedTenant> {
   const t = await getActiveTenant();
   if (!t) throw new Error("No tenant resolved for this request");
   return t;
+}
+
+/**
+ * The tenantId a dashboard viewer is hard-locked to (spec invariant #12 — the
+ * trust boundary). Every admin/student query MUST filter by this. It comes
+ * from the authenticated user's own row, never from the host/URL, so tampering
+ * cannot widen scope (acceptance #5/#6). Super users have no tenant and must
+ * use /super-admin — they're redirected out of tenant dashboards.
+ */
+export async function requireTenantId(): Promise<string> {
+  const u = await getCurrentUser();
+  if (!u || !u.tenantId) redirect("/forbidden");
+  return u.tenantId;
 }

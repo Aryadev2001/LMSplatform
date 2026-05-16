@@ -24,9 +24,10 @@ type ClerkUserCreated = {
     last_name?: string | null;
     image_url?: string | null;
     public_metadata?: {
-      role?: "admin" | "student";
+      role?: string;
       enrollmentId?: string;
       invitedPermissions?: string[];
+      tenantId?: string;
     };
   };
 };
@@ -84,6 +85,12 @@ export async function POST(req: Request) {
   const isStudent = isStudentRole(role);
   const fullName = [data.first_name, data.last_name].filter(Boolean).join(" ").trim() || null;
   const invitedPermissions = isAdmin ? (data.public_metadata?.invitedPermissions ?? []) : [];
+  // Tenant comes from the invite metadata (set by the inviter). Super roles
+  // are tenant-less by design.
+  const metaTenantId =
+    typeof data.public_metadata?.tenantId === "string"
+      ? (data.public_metadata.tenantId as string)
+      : null;
 
   // Upsert users row
   const existing = await db.select().from(users).where(eq(users.clerkId, data.id)).limit(1);
@@ -98,6 +105,7 @@ export async function POST(req: Request) {
         avatarUrl: data.image_url ?? null,
         role,
         permissions: invitedPermissions,
+        tenantId: metaTenantId,
       })
       .returning({ id: users.id });
     userId = row.id;
@@ -113,6 +121,9 @@ export async function POST(req: Request) {
         ...(isAdmin && invitedPermissions.length > 0
           ? { permissions: invitedPermissions }
           : {}),
+        // Only backfill tenant if not already set — never reassign on a
+        // routine Clerk update (stale metadata must not move a user).
+        ...(metaTenantId && !existing[0].tenantId ? { tenantId: metaTenantId } : {}),
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));

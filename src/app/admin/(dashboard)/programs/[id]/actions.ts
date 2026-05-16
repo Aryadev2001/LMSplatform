@@ -2,14 +2,47 @@
 
 import { z } from "zod";
 import { db } from "@/db/client";
-import { modules, lessons } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { modules, lessons, programs } from "@/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { requireTenantId } from "@/lib/tenant";
 
 async function gate() {
   await requireRole("admin");
 }
+
+/** The course must belong to the caller's tenant (acceptance #6). */
+async function ownsCourse(courseId: string): Promise<boolean> {
+  const tenantId = await requireTenantId();
+  const [c] = await db
+    .select({ id: programs.id })
+    .from(programs)
+    .where(and(eq(programs.id, courseId), eq(programs.tenantId, tenantId)))
+    .limit(1);
+  return !!c;
+}
+
+async function moduleInCourse(moduleId: string, courseId: string): Promise<boolean> {
+  const [m] = await db
+    .select({ id: modules.id })
+    .from(modules)
+    .where(and(eq(modules.id, moduleId), eq(modules.courseId, courseId)))
+    .limit(1);
+  return !!m;
+}
+
+async function lessonInCourse(lessonId: string, courseId: string): Promise<boolean> {
+  const [l] = await db
+    .select({ id: lessons.id })
+    .from(lessons)
+    .innerJoin(modules, eq(modules.id, lessons.moduleId))
+    .where(and(eq(lessons.id, lessonId), eq(modules.courseId, courseId)))
+    .limit(1);
+  return !!l;
+}
+
+const DENIED = { success: false as const, error: "Not found in your workspace." };
 
 const ResourceSchema = z.object({
   label: z.string().min(1).max(160),
@@ -27,6 +60,7 @@ export async function createModule(input: z.infer<typeof ModuleSchema>) {
   await gate();
   const p = ModuleSchema.safeParse(input);
   if (!p.success) return { success: false as const, error: p.error.issues[0]?.message ?? "Invalid" };
+  if (!(await ownsCourse(p.data.courseId))) return DENIED;
   const [{ max }] = await db
     .select({ max: sql<number>`coalesce(max(order_index), -1)::int` })
     .from(modules)
@@ -49,6 +83,8 @@ export async function updateModule(
 ) {
   await gate();
   if (title.trim().length < 2) return { success: false as const, error: "Title too short" };
+  if (!(await ownsCourse(courseId)) || !(await moduleInCourse(moduleId, courseId)))
+    return DENIED;
   await db
     .update(modules)
     .set({ title: title.trim(), description: description || null })
@@ -62,6 +98,8 @@ export async function deleteModule(
   courseId: string,
 ): Promise<{ success: boolean; error?: string }> {
   await gate();
+  if (!(await ownsCourse(courseId)) || !(await moduleInCourse(moduleId, courseId)))
+    return DENIED;
   try {
     await db.delete(modules).where(eq(modules.id, moduleId));
     revalidatePath(`/admin/programs/${courseId}`);
@@ -85,6 +123,8 @@ export async function createLesson(input: z.infer<typeof LessonSchema>) {
   await gate();
   const p = LessonSchema.safeParse(input);
   if (!p.success) return { success: false as const, error: p.error.issues[0]?.message ?? "Invalid" };
+  if (!(await ownsCourse(p.data.courseId)) || !(await moduleInCourse(p.data.moduleId, p.data.courseId)))
+    return DENIED;
   const [{ max }] = await db
     .select({ max: sql<number>`coalesce(max(order_index), -1)::int` })
     .from(lessons)
@@ -108,6 +148,8 @@ export async function updateLesson(
   await gate();
   const p = LessonSchema.safeParse(input);
   if (!p.success) return { success: false as const, error: p.error.issues[0]?.message ?? "Invalid" };
+  if (!(await ownsCourse(p.data.courseId)) || !(await lessonInCourse(lessonId, p.data.courseId)))
+    return DENIED;
   await db
     .update(lessons)
     .set({
@@ -126,6 +168,8 @@ export async function deleteLesson(
   courseId: string,
 ): Promise<{ success: boolean; error?: string }> {
   await gate();
+  if (!(await ownsCourse(courseId)) || !(await lessonInCourse(lessonId, courseId)))
+    return DENIED;
   try {
     await db.delete(lessons).where(eq(lessons.id, lessonId));
     revalidatePath(`/admin/programs/${courseId}`);

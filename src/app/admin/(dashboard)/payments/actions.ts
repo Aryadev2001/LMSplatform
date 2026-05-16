@@ -2,9 +2,10 @@
 
 import { db } from "@/db/client";
 import { payments } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { requireTenantId } from "@/lib/tenant";
 import { users } from "@/db/schema";
 import { hasPermission } from "@/lib/permissions";
 import { syncPaymentsFromStripe } from "@/lib/stripe-sync";
@@ -38,11 +39,12 @@ export async function syncStripeAction() {
 export async function markRefunded(paymentId: string, amountCents: number) {
   const gate = await requireViewPayments();
   if (!gate.ok) return { success: false as const, error: gate.error };
+  const tenantId = await requireTenantId();
 
   const [pay] = await db
     .select({ amountCents: payments.amountCents, refundedCents: payments.refundedCents })
     .from(payments)
-    .where(eq(payments.id, paymentId))
+    .where(and(eq(payments.id, paymentId), eq(payments.tenantId, tenantId)))
     .limit(1);
   if (!pay) return { success: false as const, error: "Payment not found" };
 
@@ -55,7 +57,7 @@ export async function markRefunded(paymentId: string, amountCents: number) {
       refundedCents: newRefunded,
       status: fullyRefunded ? "refunded" : "succeeded",
     })
-    .where(eq(payments.id, paymentId));
+    .where(and(eq(payments.id, paymentId), eq(payments.tenantId, tenantId)));
 
   revalidatePath("/admin/payments");
   return { success: true as const };

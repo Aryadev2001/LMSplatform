@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { buttonVariants } from "@/components/ui/button";
 import { getCourseBySlug, formatInr, formatRuntime, tierBadgeStyle } from "@/lib/courses";
+import { getTenantFromRequest } from "@/lib/tenant";
 import { CheckCircle2, PlayCircle, Clock, Layers, ArrowRight } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -20,8 +21,19 @@ export default async function CourseLandingPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const data = await getCourseBySlug(slug);
-  if (!data || data.course.status !== "published") notFound();
+  const [data, hostTenant] = await Promise.all([
+    getCourseBySlug(slug),
+    getTenantFromRequest(),
+  ]);
+  // Only surface the host tenant's published course (master courses are
+  // tenant-less + draft, so they're excluded here anyway).
+  if (
+    !data ||
+    data.course.status !== "published" ||
+    data.course.tenantId !== hostTenant?.id
+  ) {
+    notFound();
+  }
 
   const { course, modules, totalLessons, totalSeconds } = data;
   const isHigh = course.requiresApplication;

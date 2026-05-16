@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { db } from "@/db/client";
 import { programs } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { getTenantFromRequest } from "@/lib/tenant";
 import { Brand } from "@/components/brand";
 import { EnrollmentForm } from "./enrollment-form";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,14 +23,32 @@ export default async function EnrollPage({
 }) {
   const { course: courseParam, ref: refCode } = await searchParams;
 
-  // Resolve the course — from ?course= or default to the ₹99 entry product.
+  // Resolve the course within the HOST tenant only — a tenant site can never
+  // surface another tenant's course via ?course= (spec invariant #12).
+  const hostTenant = await getTenantFromRequest();
+  const hostTenantId = hostTenant?.id ?? null;
+
   const [course] =
-    (courseParam
-      ? await db.select().from(programs).where(eq(programs.slug, courseParam)).limit(1)
+    (courseParam && hostTenantId
+      ? await db
+          .select()
+          .from(programs)
+          .where(
+            and(eq(programs.slug, courseParam), eq(programs.tenantId, hostTenantId)),
+          )
+          .limit(1)
       : []) ?? [];
   const [fallback] = course
     ? [course]
-    : await db.select().from(programs).where(eq(programs.slug, "business-x-ray")).limit(1);
+    : hostTenantId
+      ? await db
+          .select()
+          .from(programs)
+          .where(
+            and(eq(programs.slug, "business-x-ray"), eq(programs.tenantId, hostTenantId)),
+          )
+          .limit(1)
+      : [];
   const selected = course ?? fallback;
 
   return (

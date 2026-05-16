@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { db } from "@/db/client";
 import { users, programs, enrollments, payments } from "@/db/schema";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
+import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,22 +33,26 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive"> =
 };
 
 export default async function AdminOverviewPage() {
+  const tenantId = await requireTenantId();
   // Run every query in parallel — was previously 6 sequential round-trips.
+  // Every query is tenant-scoped (spec invariant #12).
   const [counts, pendingEnrollments, revenueRow, recentEnrollments, topProgramsRows] =
     await Promise.all([
       db
         .select({
           students: sql<number>`count(*) filter (where role in ('student','STUDENT','coach'))::int`,
         })
-        .from(users),
+        .from(users)
+        .where(eq(users.tenantId, tenantId)),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(enrollments)
-        .where(eq(enrollments.status, "paid")),
+        .innerJoin(programs, eq(programs.id, enrollments.programId))
+        .where(and(eq(enrollments.status, "paid"), eq(programs.tenantId, tenantId))),
       db
         .select({ sum: sql<number>`coalesce(sum(amount_cents)::int, 0)` })
         .from(payments)
-        .where(eq(payments.status, "succeeded")),
+        .where(and(eq(payments.status, "succeeded"), eq(payments.tenantId, tenantId))),
       db
         .select({
           id: enrollments.id,
@@ -57,6 +62,8 @@ export default async function AdminOverviewPage() {
           createdAt: enrollments.createdAt,
         })
         .from(enrollments)
+        .innerJoin(programs, eq(programs.id, enrollments.programId))
+        .where(eq(programs.tenantId, tenantId))
         .orderBy(desc(enrollments.createdAt))
         .limit(5),
       db
@@ -68,6 +75,7 @@ export default async function AdminOverviewPage() {
           isActive: programs.isActive,
         })
         .from(programs)
+        .where(eq(programs.tenantId, tenantId))
         .orderBy(desc(programs.createdAt))
         .limit(4),
     ]);

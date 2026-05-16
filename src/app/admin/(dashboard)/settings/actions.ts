@@ -5,7 +5,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/db/client";
 import { users, tenants, domainRequests, tierRewards, programs } from "@/db/schema";
 import { eq, and, ne } from "drizzle-orm";
-import { getRootDomain } from "@/lib/tenant";
+import { getRootDomain, requireTenantId } from "@/lib/tenant";
 import { revalidatePath } from "next/cache";
 import { requireRole, getCurrentUser, CANONICAL_ADMIN } from "@/lib/auth";
 import { ADMIN_PERMISSIONS, type AdminPermission } from "@/lib/permissions";
@@ -39,6 +39,7 @@ export type AddAdminResult = { success: true; email: string } | { success: false
 export async function addAdmin(input: z.infer<typeof AddAdminSchema>): Promise<AddAdminResult> {
   const gate = await requireManageAdmins();
   if (!gate.ok) return { success: false, error: gate.error };
+  const tenantId = await requireTenantId();
 
   const parsed = AddAdminSchema.safeParse(input);
   if (!parsed.success) {
@@ -64,11 +65,18 @@ export async function addAdmin(input: z.infer<typeof AddAdminSchema>): Promise<A
         role: CANONICAL_ADMIN,
         isSuperAdmin: false,
         permissions,
+        tenantId,
       });
     } else {
       await db
         .update(users)
-        .set({ role: CANONICAL_ADMIN, isSuperAdmin: false, permissions, updatedAt: new Date() })
+        .set({
+          role: CANONICAL_ADMIN,
+          isSuperAdmin: false,
+          permissions,
+          tenantId,
+          updatedAt: new Date(),
+        })
         .where(eq(users.clerkId, clerkUser.id));
     }
   } else {
@@ -77,7 +85,11 @@ export async function addAdmin(input: z.infer<typeof AddAdminSchema>): Promise<A
       await clerk.invitations.createInvitation({
         emailAddress: email,
         redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/admin`,
-        publicMetadata: { role: CANONICAL_ADMIN, invitedPermissions: permissions },
+        publicMetadata: {
+          role: CANONICAL_ADMIN,
+          invitedPermissions: permissions,
+          tenantId,
+        },
         notify: true,
       });
     } catch (err) {
@@ -98,6 +110,7 @@ export async function updateAdminPermissions(
 ) {
   const gate = await requireManageAdmins();
   if (!gate.ok) return { success: false as const, error: gate.error };
+  const tenantId = await requireTenantId();
 
   const parsed = PermsSchema.safeParse(permissions);
   if (!parsed.success) {
@@ -105,18 +118,21 @@ export async function updateAdminPermissions(
   }
 
   const [target] = await db
-    .select({ isSuperAdmin: users.isSuperAdmin })
+    .select({ isSuperAdmin: users.isSuperAdmin, tenantId: users.tenantId })
     .from(users)
     .where(eq(users.id, targetUserId))
     .limit(1);
-  if (target?.isSuperAdmin) {
+  if (!target || target.tenantId !== tenantId) {
+    return { success: false as const, error: "Admin not found in your workspace." };
+  }
+  if (target.isSuperAdmin) {
     return { success: false as const, error: "Super admin permissions can't be changed." };
   }
 
   await db
     .update(users)
     .set({ permissions: parsed.data, updatedAt: new Date() })
-    .where(eq(users.id, targetUserId));
+    .where(and(eq(users.id, targetUserId), eq(users.tenantId, tenantId)));
   revalidatePath("/admin/settings");
   return { success: true as const };
 }
@@ -124,15 +140,22 @@ export async function updateAdminPermissions(
 export async function removeAdmin(targetUserId: string) {
   const gate = await requireManageAdmins();
   if (!gate.ok) return { success: false as const, error: gate.error };
+  const tenantId = await requireTenantId();
 
   const me = await getCurrentUser();
   const [target] = await db
-    .select({ clerkId: users.clerkId, isSuperAdmin: users.isSuperAdmin })
+    .select({
+      clerkId: users.clerkId,
+      isSuperAdmin: users.isSuperAdmin,
+      tenantId: users.tenantId,
+    })
     .from(users)
     .where(eq(users.id, targetUserId))
     .limit(1);
 
-  if (!target) return { success: false as const, error: "Admin not found" };
+  if (!target || target.tenantId !== tenantId) {
+    return { success: false as const, error: "Admin not found in your workspace." };
+  }
   if (target.isSuperAdmin) {
     return { success: false as const, error: "The super admin can't be removed." };
   }
@@ -149,7 +172,9 @@ export async function removeAdmin(targetUserId: string) {
   } catch {
     /* ignore — Clerk user may already be gone */
   }
-  await db.delete(users).where(eq(users.id, targetUserId));
+  await db
+    .delete(users)
+    .where(and(eq(users.id, targetUserId), eq(users.tenantId, tenantId)));
 
   revalidatePath("/admin/settings");
   return { success: true as const };

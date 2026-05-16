@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { enrollments, programs } from "@/db/schema";
 import { desc, eq, and, or, ilike, type SQL } from "drizzle-orm";
+import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { Card } from "@/components/ui/card";
@@ -59,10 +60,12 @@ export default async function AdminEnrollmentsPage({
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
   const { q, status } = await searchParams;
+  const tenantId = await requireTenantId();
   const search = q?.trim();
   const validStatus = STATUS_FILTER_OPTIONS.slice(1).map((o) => o.value);
 
-  const conditions: SQL[] = [];
+  // Tenant scope: only enrollments whose course belongs to this tenant.
+  const conditions: SQL[] = [eq(programs.tenantId, tenantId)];
   if (search) {
     const s = or(
       ilike(enrollments.fullName, `%${search}%`),

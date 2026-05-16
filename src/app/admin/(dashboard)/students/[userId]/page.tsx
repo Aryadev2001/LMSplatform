@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { formatCurrency, formatDate, initialsOf } from "@/lib/format";
 import { isStudentRole } from "@/lib/auth";
+import { requireTenantId } from "@/lib/tenant";
 import { AssignDialog } from "../assign-dialog";
 import { PaymentDetail } from "../../payments/payment-detail";
 import {
@@ -46,9 +47,12 @@ export default async function StudentDetailPage({
   params: Promise<{ userId: string }>;
 }) {
   const { userId } = await params;
+  const tenantId = await requireTenantId();
 
   const [me] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!me || !isStudentRole(me.role)) notFound();
+  // Tenant isolation: a tenant admin can only open students in their own
+  // tenant — guessing another tenant's userId 404s (acceptance #5).
+  if (!me || !isStudentRole(me.role) || me.tenantId !== tenantId) notFound();
 
   const [studentRows, sessionRows, assignmentRows, paymentRows, enrollmentRows, programOptions] =
     await Promise.all([
@@ -77,7 +81,8 @@ export default async function StudentDetailPage({
         .orderBy(desc(enrollments.createdAt)),
       db
         .select({ id: programs.id, name: programs.name, isActive: programs.isActive })
-        .from(programs),
+        .from(programs)
+        .where(eq(programs.tenantId, tenantId)),
     ]);
 
   const student = studentRows[0];

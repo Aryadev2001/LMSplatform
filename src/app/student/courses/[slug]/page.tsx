@@ -6,6 +6,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { requireRole } from "@/lib/auth";
+import { requireTenantId } from "@/lib/tenant";
 import { getCourseBySlug } from "@/lib/courses";
 import { CoursePlayer } from "./course-player";
 import { Award } from "lucide-react";
@@ -19,11 +20,14 @@ export default async function StudentCourseDeliveryPage({
 }) {
   const { slug } = await params;
   const auth = await requireRole("student");
+  const tenantId = await requireTenantId();
   const [me] = await db.select().from(users).where(eq(users.clerkId, auth.userId)).limit(1);
   if (!me) return null;
 
   const data = await getCourseBySlug(slug);
-  if (!data) notFound();
+  // Cross-tenant course access blocked (acceptance #6): a student can only
+  // open a course inside their own tenant.
+  if (!data || data.course.tenantId !== tenantId) notFound();
   const { course, modules } = data;
 
   const [stu] = await db

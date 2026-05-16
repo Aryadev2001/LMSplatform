@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { programs, modules, lessons } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
+import { requireTenantId } from "@/lib/tenant";
 import { formatInr } from "@/lib/courses";
 import { ModuleDialog, DeleteModuleButton, DeleteLessonButton } from "./module-dialog";
 import { LessonDialog } from "./lesson-dialog";
@@ -23,9 +24,11 @@ export default async function CourseContentPage({
 }) {
   await requireRole("admin");
   const { id } = await params;
+  const tenantId = await requireTenantId();
 
   const [course] = await db.select().from(programs).where(eq(programs.id, id)).limit(1);
-  if (!course) notFound();
+  // Cross-tenant course access blocked (acceptance #6).
+  if (!course || course.tenantId !== tenantId) notFound();
 
   const mods = await db
     .select()
@@ -33,7 +36,14 @@ export default async function CourseContentPage({
     .where(eq(modules.courseId, id))
     .orderBy(asc(modules.orderIndex));
 
-  const allLessons = await db.select().from(lessons).orderBy(asc(lessons.orderIndex));
+  const moduleIds = mods.map((m) => m.id);
+  const allLessons = moduleIds.length
+    ? await db
+        .select()
+        .from(lessons)
+        .where(inArray(lessons.moduleId, moduleIds))
+        .orderBy(asc(lessons.orderIndex))
+    : [];
   const lessonsByModule = (moduleId: string) =>
     allLessons.filter((l) => l.moduleId === moduleId);
 

@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { users, tenants, programs, tierRewards } from "@/db/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
+import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminSettingsPage() {
   await requireRole("admin");
   const me = await getCurrentUser();
+  const scopeTenantId = await requireTenantId();
 
   const [adminRows, meRow] = await Promise.all([
     db
@@ -42,7 +44,12 @@ export default async function AdminSettingsPage() {
         createdAt: users.createdAt,
       })
       .from(users)
-      .where(inArray(users.role, [...ADMIN_DB_ROLES]))
+      .where(
+        and(
+          eq(users.tenantId, scopeTenantId),
+          inArray(users.role, [...ADMIN_DB_ROLES]),
+        ),
+      )
       .orderBy(desc(users.isSuperAdmin), desc(users.createdAt)),
     me
       ? db
