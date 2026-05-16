@@ -86,16 +86,78 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     };
   }
 
-  // Last resort: Clerk publicMetadata (newly-invited users before DB sync)
+  // No DB row yet → just-in-time provisioning from the Clerk invitation
+  // metadata (role + tenantId). This replaces the optional Clerk webhook:
+  // an invited tenant-admin / student gets their tenant-scoped row on their
+  // first authenticated request, so no infra (CLERK_WEBHOOK_SECRET) is
+  // required for invites to work end-to-end.
   try {
     const cu = await currentUser();
-    const metaRole = (cu?.publicMetadata as { role?: RawRole } | undefined)?.role ?? null;
+    const meta = (cu?.publicMetadata ?? {}) as {
+      role?: string;
+      tenantId?: string;
+    };
+    const rawMeta = meta.role ?? null;
+    const email = cu?.primaryEmailAddress?.emailAddress ?? null;
+
+    // Can't determine a role → leave unprovisioned (→ /onboarding).
+    if (!rawMeta || !email) {
+      return {
+        userId,
+        rawRole: (rawMeta as RawRole | null) ?? null,
+        role: normalizeRole(rawMeta as RawRole | null),
+        tenantId: null,
+        email: email ?? undefined,
+      };
+    }
+
+    // Canonicalize like the webhook does; super roles pass through tenant-less.
+    const canonical: RawRole = isAdminRole(rawMeta)
+      ? CANONICAL_ADMIN
+      : isStudentRole(rawMeta)
+        ? CANONICAL_STUDENT
+        : (rawMeta as RawRole);
+    const isSuper = SUPER_ROLES.includes(canonical);
+    const tenantId =
+      !isSuper && typeof meta.tenantId === "string" ? meta.tenantId : null;
+    const fullName =
+      [cu?.firstName, cu?.lastName].filter(Boolean).join(" ").trim() || null;
+
+    try {
+      await db.insert(users).values({
+        clerkId: userId,
+        email,
+        fullName,
+        role: canonical,
+        isSuperAdmin: isSuper,
+        tenantId,
+      });
+    } catch {
+      // Lost an insert race (or email already attached to another clerkId):
+      // re-read so we return the authoritative persisted row.
+      const [again] = await db
+        .select({ role: users.role, email: users.email, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, userId))
+        .limit(1);
+      if (again) {
+        const raw = again.role as RawRole;
+        return {
+          userId,
+          rawRole: raw,
+          role: normalizeRole(raw),
+          tenantId: again.tenantId,
+          email: again.email,
+        };
+      }
+    }
+
     return {
       userId,
-      rawRole: metaRole,
-      role: normalizeRole(metaRole),
-      tenantId: null,
-      email: cu?.primaryEmailAddress?.emailAddress,
+      rawRole: canonical,
+      role: normalizeRole(canonical),
+      tenantId,
+      email,
     };
   } catch {
     return { userId, rawRole: null, role: null, tenantId: null };
