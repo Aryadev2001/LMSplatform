@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { clerkClient } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { tenants, users, domainRequests } from "@/db/schema";
+import { tenants, users, domainRequests, programs } from "@/db/schema";
+import {
+  promoteToMaster,
+  pushMasterToTenant,
+  syncMasterToAllTenants,
+} from "@/lib/course-push";
 import { requireSuper, type SuperRole } from "@/lib/auth";
 import { canWrite, canManageTeam } from "@/lib/super";
 import { recordAudit } from "@/lib/audit";
@@ -325,5 +330,99 @@ export async function rejectDomainRequest(input: unknown): Promise<Result> {
   });
 
   revalidatePath("/super-admin/domains");
+  return { success: true };
+}
+
+async function actorUserId(clerkId: string): Promise<string | null> {
+  const [a] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  return a?.id ?? null;
+}
+
+export async function promoteCourseToMaster(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role — you cannot create master courses." };
+  }
+  const parsed = z.object({ courseId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
+
+  try {
+    const masterId = await promoteToMaster(parsed.data.courseId);
+    await recordAudit({
+      action: "course.promote_master",
+      targetType: "program",
+      targetId: masterId,
+      metadata: { sourceCourseId: parsed.data.courseId },
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Promote failed" };
+  }
+
+  revalidatePath("/super-admin/courses");
+  return { success: true };
+}
+
+export async function pushMasterCourse(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role — you cannot push courses." };
+  }
+  const parsed = z
+    .object({ masterId: z.string().uuid(), tenantIds: z.array(z.string().uuid()).min(1) })
+    .safeParse(input);
+  if (!parsed.success) return { success: false, error: "Pick at least one tenant." };
+
+  const actor = await actorUserId(me.userId);
+  try {
+    for (const tenantId of parsed.data.tenantIds) {
+      await pushMasterToTenant({
+        masterId: parsed.data.masterId,
+        tenantId,
+        pushedByUserId: actor,
+      });
+    }
+    await recordAudit({
+      action: "course.push",
+      targetType: "program",
+      targetId: parsed.data.masterId,
+      metadata: { tenantIds: parsed.data.tenantIds },
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Push failed" };
+  }
+
+  revalidatePath("/super-admin/courses");
+  return { success: true };
+}
+
+export async function syncMasterCourse(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role — you cannot sync courses." };
+  }
+  const parsed = z.object({ masterId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
+
+  const actor = await actorUserId(me.userId);
+  try {
+    const { tenants: n } = await syncMasterToAllTenants({
+      masterId: parsed.data.masterId,
+      pushedByUserId: actor,
+    });
+    await recordAudit({
+      action: "course.sync",
+      targetType: "program",
+      targetId: parsed.data.masterId,
+      metadata: { tenantsSynced: n },
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Sync failed" };
+  }
+
+  revalidatePath("/super-admin/courses");
   return { success: true };
 }
