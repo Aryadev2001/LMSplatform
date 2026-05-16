@@ -11,6 +11,7 @@ import {
   Users2,
   ScrollText,
   Globe,
+  Gift,
 } from "lucide-react";
 
 export type DashRole = "admin" | "student" | "super";
@@ -35,6 +36,7 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
     { label: "Overview", href: "/student", icon: LayoutDashboard },
     { label: "My Courses", href: "/student/courses", icon: BookOpen },
     { label: "My Diagnostic", href: "/student/diagnostic", icon: Activity },
+    { label: "Referrals", href: "/student/referrals", icon: Gift },
     { label: "Settings", href: "/student/settings", icon: Settings },
   ],
   super: [

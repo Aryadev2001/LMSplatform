@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
-import { enrollments, programs } from "@/db/schema";
+import { enrollments, programs, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Brand } from "@/components/brand";
 import { Card } from "@/components/ui/card";
 import { formatInr } from "@/lib/courses";
+import { getTenantFromRequest } from "@/lib/tenant";
+import { computeRedeemable } from "@/lib/referral";
 import { PayButton } from "./pay-button";
 import { CheckCircle2, CreditCard } from "lucide-react";
 
@@ -16,9 +18,9 @@ export const metadata = { title: "Secure checkout — EDT" };
 export default async function PaymentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ e?: string }>;
+  searchParams: Promise<{ e?: string; ref?: string }>;
 }) {
-  const { e } = await searchParams;
+  const { e, ref } = await searchParams;
   if (!e) notFound();
 
   const [enr] = await db.select().from(enrollments).where(eq(enrollments.id, e)).limit(1);
@@ -50,6 +52,34 @@ export default async function PaymentPage({
   if (!course) notFound();
 
   const amount = formatInr(course.priceCents);
+
+  // Returning buyer with a points balance → offer redemption (no negative order).
+  const tenant = await getTenantFromRequest();
+  const [existingBuyer] = await db
+    .select({ bal: users.pointsBalance })
+    .from(users)
+    .where(eq(users.email, enr.email.toLowerCase()))
+    .limit(1);
+
+  let redeem: { points: number; discountLabel: string; netLabel: string } | null = null;
+  if (
+    tenant?.referralEnabled &&
+    existingBuyer &&
+    existingBuyer.bal > 0
+  ) {
+    const r = computeRedeemable({
+      pointsBalance: existingBuyer.bal,
+      cartCents: course.priceCents,
+      redeemMaxPercent: tenant.referralRedeemMaxPercent,
+    });
+    if (r.points > 0) {
+      redeem = {
+        points: r.points,
+        discountLabel: formatInr(r.discountCents),
+        netLabel: formatInr(course.priceCents - r.discountCents),
+      };
+    }
+  }
 
   return (
     <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-secondary/20 px-6 py-12">
@@ -110,7 +140,13 @@ export default async function PaymentPage({
           </div>
 
           <div className="mt-5">
-            <PayButton enrollmentId={enr.id} amountLabel={amount} email={enr.email} />
+            <PayButton
+              enrollmentId={enr.id}
+              amountLabel={amount}
+              email={enr.email}
+              referralCode={ref ?? null}
+              redeem={redeem}
+            />
           </div>
         </Card>
       </div>

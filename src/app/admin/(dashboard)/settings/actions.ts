@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/db/client";
-import { users, tenants, domainRequests } from "@/db/schema";
+import { users, tenants, domainRequests, tierRewards, programs } from "@/db/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { getRootDomain } from "@/lib/tenant";
 import { revalidatePath } from "next/cache";
@@ -275,6 +275,64 @@ export async function requestCustomDomain(
     targetType: "tenant",
     targetId: me.tenantId,
     metadata: { domain },
+  });
+
+  revalidatePath("/admin/settings");
+  return { success: true };
+}
+
+const TierRewardSchema = z.object({
+  tier: z.enum(["BRONZE", "SILVER", "GOLD", "PLATINUM"]),
+  courseId: z.string().uuid().nullable(),
+});
+
+/**
+ * Tenant-admin maps a referral tier → one reward course (or clears it).
+ * Tenant scope derived from the SESSION; the course must belong to the same
+ * tenant (no cross-tenant reward wiring). Audited.
+ */
+export async function setTierReward(
+  input: unknown,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const me = await requireRole("admin");
+  if (!me.tenantId) {
+    return { success: false, error: "Your account is not attached to a tenant." };
+  }
+  const parsed = TierRewardSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const { tier, courseId } = parsed.data;
+
+  if (courseId) {
+    const [course] = await db
+      .select({ id: programs.id, tenantId: programs.tenantId })
+      .from(programs)
+      .where(eq(programs.id, courseId))
+      .limit(1);
+    if (!course || course.tenantId !== me.tenantId) {
+      return { success: false, error: "That course is not in your catalog." };
+    }
+  }
+
+  // Replace the mapping for this tenant+tier (one reward course per tier).
+  await db
+    .delete(tierRewards)
+    .where(and(eq(tierRewards.tenantId, me.tenantId), eq(tierRewards.tier, tier)));
+
+  if (courseId) {
+    await db.insert(tierRewards).values({
+      tenantId: me.tenantId,
+      tier,
+      courseId,
+    });
+  }
+
+  await recordAudit({
+    action: "tier_reward.set",
+    targetType: "tenant",
+    targetId: me.tenantId,
+    metadata: { tier, courseId },
   });
 
   revalidatePath("/admin/settings");

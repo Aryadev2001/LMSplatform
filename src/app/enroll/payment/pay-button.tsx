@@ -5,23 +5,32 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { completeMockPayment } from "../actions";
 
 export function PayButton({
   enrollmentId,
   amountLabel,
   email,
+  referralCode,
+  redeem,
 }: {
   enrollmentId: string;
   amountLabel: string;
   email: string;
+  referralCode?: string | null;
+  redeem?: { points: number; discountLabel: string; netLabel: string } | null;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [usePoints, setUsePoints] = useState(false);
 
   async function pay() {
     setPending(true);
-    const r = await completeMockPayment(enrollmentId);
+    const r = await completeMockPayment(enrollmentId, {
+      referralCode: referralCode ?? undefined,
+      redeemPoints: usePoints,
+    });
     if (r.success) {
       router.push(`/enroll/success?email=${encodeURIComponent(r.email)}`);
     } else {
@@ -32,6 +41,25 @@ export function PayButton({
 
   return (
     <div className="space-y-3">
+      {redeem && (
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-black/10 bg-secondary/40 p-3">
+          <Checkbox
+            checked={usePoints}
+            onCheckedChange={(c) => setUsePoints(c === true)}
+            className="mt-0.5"
+          />
+          <span className="text-xs">
+            <span className="font-medium text-foreground">
+              Use {redeem.points} points (−{redeem.discountLabel})
+            </span>
+            <br />
+            <span className="text-muted-foreground">
+              You&apos;ll pay {redeem.netLabel} instead of {amountLabel}.
+            </span>
+          </span>
+        </label>
+      )}
+
       <Button
         onClick={pay}
         disabled={pending}
@@ -44,7 +72,8 @@ export function PayButton({
           </>
         ) : (
           <>
-            <Lock className="size-4" /> Pay {amountLabel}
+            <Lock className="size-4" />
+            Pay {redeem && usePoints ? redeem.netLabel : amountLabel}
           </>
         )}
       </Button>

@@ -6,6 +6,13 @@ import { db } from "@/db/client";
 import { enrollments, programs, payments, users, students } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { CANONICAL_STUDENT } from "@/lib/auth";
+import { getTenantFromRequest } from "@/lib/tenant";
+import {
+  ensureReferralCode,
+  resolveReferrer,
+  awardReferralForPurchase,
+  redeemPointsAtCheckout,
+} from "@/lib/referral";
 
 const EnrollmentSchema = z.object({
   fullName: z.string().min(2, "Please enter your full name").max(200),
@@ -68,7 +75,10 @@ export type PaymentResult =
  * It marks paid, records the payment, then provisions the student account +
  * course access DIRECTLY (no Clerk webhook dependency) so access is instant.
  */
-export async function completeMockPayment(enrollmentId: string): Promise<PaymentResult> {
+export async function completeMockPayment(
+  enrollmentId: string,
+  opts?: { referralCode?: string; redeemPoints?: boolean },
+): Promise<PaymentResult> {
   const [enr] = await db
     .select()
     .from(enrollments)
@@ -85,22 +95,28 @@ export async function completeMockPayment(enrollmentId: string): Promise<Payment
   if (!course) return { success: false, error: "Course not found." };
 
   const email = enr.email.toLowerCase();
+  const tenant = await getTenantFromRequest();
+  const tenantId = tenant?.id ?? null;
 
-  // 1. Mark paid + record payment
+  // 1. Mark paid + record payment (capture id for the points ledger)
   await db
     .update(enrollments)
     .set({ status: "paid", updatedAt: new Date() })
     .where(eq(enrollments.id, enrollmentId));
 
-  await db.insert(payments).values({
-    enrollmentId,
-    amountCents: course.priceCents,
-    currency: course.currency,
-    status: "succeeded",
-    description: `${course.name} — enrollment`,
-    paymentMethodLabel: "Test mode",
-    stripePaymentIntentId: `pi_mock_${Math.random().toString(36).slice(2, 12)}`,
-  });
+  const [payment] = await db
+    .insert(payments)
+    .values({
+      enrollmentId,
+      amountCents: course.priceCents,
+      currency: course.currency,
+      status: "succeeded",
+      description: `${course.name} — enrollment`,
+      paymentMethodLabel: "Test mode",
+      stripePaymentIntentId: `pi_mock_${Math.random().toString(36).slice(2, 12)}`,
+      tenantId,
+    })
+    .returning({ id: payments.id });
 
   // 2. Provision the Clerk user (create if missing) with role=student
   const clerk = await clerkClient();
@@ -137,6 +153,7 @@ export async function completeMockPayment(enrollmentId: string): Promise<Payment
     .limit(1);
 
   let userId: string;
+  let isNewUser = false;
   if (!dbUser) {
     const [row] = await db
       .insert(users)
@@ -145,15 +162,42 @@ export async function completeMockPayment(enrollmentId: string): Promise<Payment
         email,
         fullName: enr.fullName,
         role: CANONICAL_STUDENT,
+        tenantId, // closes the latent tenant-less-signup gap
       })
       .returning({ id: users.id });
     userId = row.id;
+    isNewUser = true;
   } else {
     userId = dbUser.id;
     await db
       .update(users)
-      .set({ role: CANONICAL_STUDENT, updatedAt: new Date() })
+      .set({
+        role: CANONICAL_STUDENT,
+        ...(tenantId ? { tenantId } : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, userId));
+  }
+
+  // Link this payment to the student + give them their own referral code.
+  await db
+    .update(payments)
+    .set({ studentUserId: userId })
+    .where(eq(payments.id, payment.id));
+
+  if (tenant) {
+    await ensureReferralCode(userId, tenant.slug);
+  }
+
+  // Attribute the referral on a brand-new signup that arrived via a code.
+  if (isNewUser && tenantId && opts?.referralCode) {
+    const referrer = await resolveReferrer(opts.referralCode.trim(), tenantId);
+    if (referrer && referrer.id !== userId) {
+      await db
+        .update(users)
+        .set({ referredById: referrer.id, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+    }
   }
 
   const [stu] = await db
@@ -179,6 +223,34 @@ export async function completeMockPayment(enrollmentId: string): Promise<Payment
     .update(enrollments)
     .set({ status: "account_created", userId, updatedAt: new Date() })
     .where(eq(enrollments.id, enrollmentId));
+
+  // 4. Points: optional redemption by a returning buyer, then referral earn.
+  let netAmountCents = course.priceCents;
+  if (opts?.redeemPoints && tenantId && !isNewUser) {
+    const redeemed = await redeemPointsAtCheckout({
+      userId,
+      tenantId,
+      paymentId: payment.id,
+      cartCents: course.priceCents,
+    });
+    if (redeemed.discountCents > 0) {
+      netAmountCents = course.priceCents - redeemed.discountCents;
+      await db
+        .update(payments)
+        .set({ amountCents: netAmountCents, pointsRedeemed: redeemed.points })
+        .where(eq(payments.id, payment.id));
+    }
+  }
+
+  // The referred buyer just paid → activate referral + reward the referrer.
+  if (tenantId) {
+    await awardReferralForPurchase({
+      referredUserId: userId,
+      paymentId: payment.id,
+      amountCents: netAmountCents,
+      tenantId,
+    });
+  }
 
   return { success: true, email };
 }

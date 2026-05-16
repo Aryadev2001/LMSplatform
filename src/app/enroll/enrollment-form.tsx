@@ -25,7 +25,13 @@ const FormSchema = z.object({
 
 type FormValues = z.infer<typeof FormSchema>;
 
-export function EnrollmentForm({ courseSlug }: { courseSlug: string }) {
+export function EnrollmentForm({
+  courseSlug,
+  refCode,
+}: {
+  courseSlug: string;
+  refCode?: string | null;
+}) {
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
 
@@ -52,7 +58,8 @@ export function EnrollmentForm({ courseSlug }: { courseSlug: string }) {
       setIsPending(false);
       return;
     }
-    router.push(`/enroll/payment?e=${result.enrollmentId}`);
+    const refQ = refCode ? `&ref=${encodeURIComponent(refCode)}` : "";
+    router.push(`/enroll/payment?e=${result.enrollmentId}${refQ}`);
   }
 
   return (

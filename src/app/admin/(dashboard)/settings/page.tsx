@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { users, tenants } from "@/db/schema";
+import { users, tenants, programs, tierRewards } from "@/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import { AddAdminDialog } from "./add-admin-dialog";
 import { AdminRowActions } from "./admin-row-actions";
 import { TenantBrandingForm } from "./tenant-branding-form";
 import { CustomDomainForm } from "./custom-domain-form";
+import { TierRewardsForm } from "./tier-rewards-form";
 import { ShieldCheck, Lock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +63,18 @@ export default async function AdminSettingsPage() {
   const canManageAdmins = hasPermission(profile, "manage_admins");
 
   const myTenantId = me?.tenantId ?? null;
+  const tenantPrograms = myTenantId
+    ? await db
+        .select({ id: programs.id, name: programs.name })
+        .from(programs)
+        .where(eq(programs.tenantId, myTenantId))
+    : [];
+  const tierRewardRows = myTenantId
+    ? await db
+        .select({ tier: tierRewards.tier, courseId: tierRewards.courseId })
+        .from(tierRewards)
+        .where(eq(tierRewards.tenantId, myTenantId))
+    : [];
   const tenantRow = myTenantId
     ? (
         await db
@@ -174,6 +187,28 @@ export default async function AdminSettingsPage() {
             <CustomDomainForm
               currentDomain={tenantRow.customDomain}
               status={tenantRow.customDomainStatus}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Referral tier rewards */}
+      {tenantRow && (
+        <Card className="border-none bg-card shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Referral tier rewards</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              When a student crosses a tier (Bronze 1 · Silver 5 · Gold 15 ·
+              Platinum 30 activated referrals), they&apos;re auto-enrolled free
+              into the course you map here.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <TierRewardsForm
+              courses={tenantPrograms}
+              current={Object.fromEntries(
+                tierRewardRows.map((r) => [r.tier, r.courseId]),
+              )}
             />
           </CardContent>
         </Card>

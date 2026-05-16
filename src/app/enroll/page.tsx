@@ -18,9 +18,9 @@ export const metadata = {
 export default async function EnrollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ course?: string }>;
+  searchParams: Promise<{ course?: string; ref?: string }>;
 }) {
-  const { course: courseParam } = await searchParams;
+  const { course: courseParam, ref: refCode } = await searchParams;
 
   // Resolve the course — from ?course= or default to the ₹99 entry product.
   const [course] =
@@ -83,7 +83,10 @@ export default async function EnrollPage({
                   Takes less than a minute. Next: secure payment.
                 </p>
               </div>
-              <EnrollmentForm courseSlug={selected?.slug ?? "business-x-ray"} />
+              <EnrollmentForm
+                courseSlug={selected?.slug ?? "business-x-ray"}
+                refCode={refCode ?? null}
+              />
             </CardContent>
           </Card>
           <p className="mt-4 text-center text-xs text-muted-foreground">

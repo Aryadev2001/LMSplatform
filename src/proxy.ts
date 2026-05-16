@@ -16,6 +16,7 @@ const isPublicRoute = createRouteMatcher([
   "/forbidden",
   "/admin/login(.*)",
   "/api/webhooks(.*)",
+  "/api/cron(.*)",
   "/api/health",
   "/api/bootstrap-admin",
   // Upload route does its OWN admin check inside the handler. Excluded from
