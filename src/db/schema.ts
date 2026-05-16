@@ -577,6 +577,11 @@ export const diagnosticSubmissions = pgTable(
     topBottlenecks: jsonb("top_bottlenecks").notNull(),
     recommendedCourseSlug: varchar("recommended_course_slug", { length: 100 }),
     firmographics: jsonb("firmographics").notNull(),
+    // Phase 7 — tenant the diagnostic was taken on (host tenant at submit
+    // time). Nullable for super-context/edge; backfilled for history.
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "cascade",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -584,6 +589,7 @@ export const diagnosticSubmissions = pgTable(
     index("diagnostic_user_idx").on(t.userId),
     index("diagnostic_created_idx").on(t.createdAt),
     index("diagnostic_stage_idx").on(t.stage),
+    index("diagnostic_tenant_idx").on(t.tenantId),
   ],
 );
 

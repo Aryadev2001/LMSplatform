@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/db/client";
-import { diagnosticSubmissions, users } from "@/db/schema";
+import { diagnosticSubmissions } from "@/db/schema";
 import { desc, and, or, ilike, eq, type SQL } from "drizzle-orm";
 import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -39,10 +39,9 @@ export default async function AdminDiagnosticsPage({
   const search = q?.trim();
   const validStages = ["foundation", "growth", "scale"];
 
-  // Scoped to submitters in this tenant. NOTE: anonymous public diagnostics
-  // (no userId) are not tenant-attributable yet — diagnostic_submissions has
-  // no tenantId column. Adding one is a separate schema task (flagged).
-  const conditions: SQL[] = [eq(users.tenantId, tenantId)];
+  // Tenant-scoped on the dedicated column — includes anonymous leads taken
+  // on this tenant's site (diagnostic_submissions.tenant_id).
+  const conditions: SQL[] = [eq(diagnosticSubmissions.tenantId, tenantId)];
   if (search) {
     const s = or(
       ilike(diagnosticSubmissions.name, `%${search}%`),
@@ -65,7 +64,6 @@ export default async function AdminDiagnosticsPage({
       createdAt: diagnosticSubmissions.createdAt,
     })
     .from(diagnosticSubmissions)
-    .innerJoin(users, eq(users.id, diagnosticSubmissions.userId))
     .where(and(...conditions))
     .orderBy(desc(diagnosticSubmissions.createdAt))
     .limit(200);

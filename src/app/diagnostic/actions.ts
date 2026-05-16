@@ -5,6 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db/client";
 import { diagnosticSubmissions, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getTenantFromRequest } from "@/lib/tenant";
 import { ALL_QUESTION_IDS, REVENUE_BANDS } from "@/lib/diagnostic/questions";
 import { scoreDiagnostic, type Answers } from "@/lib/diagnostic/scoring";
 
@@ -61,10 +62,15 @@ export async function submitDiagnostic(
     /* anonymous is allowed */
   }
 
+  // Attribute the lead to the tenant whose site it was taken on (host
+  // tenant; falls back to the default 'edt' tenant on apex/localhost).
+  const tenant = await getTenantFromRequest();
+
   const [row] = await db
     .insert(diagnosticSubmissions)
     .values({
       userId,
+      tenantId: tenant?.id ?? null,
       email: firmographics.email,
       name: firmographics.fullName,
       phone: firmographics.phone || null,
