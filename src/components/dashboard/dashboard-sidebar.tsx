@@ -16,10 +16,9 @@ import {
 } from "@/components/ui/sidebar";
 import { BrandMark } from "@/components/brand";
 import { NAV_ITEMS, ROLE_LABELS } from "./nav-items";
-import type { UserRole } from "@/lib/auth";
 
 interface DashboardSidebarProps {
-  role: UserRole;
+  role: "admin" | "student";
 }
 
 export function DashboardSidebar({ role }: DashboardSidebarProps) {

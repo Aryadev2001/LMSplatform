@@ -8,6 +8,8 @@ export default async function PostLoginPage() {
   if (!user) redirect("/sign-in");
 
   switch (user.role) {
+    case "super":
+      redirect("/super-admin");
     case "admin":
       redirect("/admin");
     case "student":

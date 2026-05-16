@@ -5,52 +5,108 @@ import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-export type UserRole = "admin" | "student";
+/** Raw role values stored in the DB (legacy + phase-7). */
+export type RawRole =
+  | "admin"
+  | "coach"
+  | "student"
+  | "SUPER_OWNER"
+  | "SUPER_STAFF"
+  | "SUPER_SUPPORT"
+  | "TENANT_ADMIN"
+  | "INSTRUCTOR"
+  | "STUDENT";
+
+/** Normalized role used by the existing dashboards (zero-churn compatibility). */
+export type UserRole = "admin" | "student" | "super";
+
+export type SuperRole = "SUPER_OWNER" | "SUPER_STAFF" | "SUPER_SUPPORT";
+
+const SUPER_ROLES: RawRole[] = ["SUPER_OWNER", "SUPER_STAFF", "SUPER_SUPPORT"];
+
+/** Map any raw DB role to the normalized role the existing app reasons about. */
+export function normalizeRole(raw: RawRole | null | undefined): UserRole | null {
+  if (!raw) return null;
+  if (raw === "admin" || raw === "TENANT_ADMIN") return "admin";
+  if (raw === "student" || raw === "STUDENT" || raw === "coach") return "student";
+  if (SUPER_ROLES.includes(raw)) return "super";
+  // INSTRUCTOR: enum slot reserved, no dashboard until built → no access
+  return null;
+}
+
+export interface CurrentUser {
+  userId: string; // clerk id
+  role: UserRole | null; // normalized
+  rawRole: RawRole | null; // exact DB role (for super-admin gating)
+  tenantId: string | null;
+  email?: string;
+}
 
 /**
- * Resolves the current user's role. Wrapped in React cache() so multiple
- * calls within a single request (layout + page) hit the DB at most once.
- *
- * Order of truth:
- * 1. Clerk session-token claim `metadata.role` (no DB hit) — requires the
- *    Clerk "Customize session token" config.
- * 2. Fallback: our DB by clerkId (always works, single indexed query).
- * 3. Last resort: Clerk publicMetadata.
+ * Resolves the current user. Cached per request.
+ * DB is the source of truth post phase-7 (Clerk session-token claim is a fast
+ * path but our DB carries the canonical role + tenantId).
  */
-export const getCurrentUser = cache(async () => {
-  const { userId, sessionClaims } = await auth();
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const { userId } = await auth();
   if (!userId) return null;
 
-  const claimRole = (sessionClaims?.metadata as { role?: UserRole } | undefined)?.role;
-  if (claimRole) {
-    return { userId, role: claimRole, email: undefined as string | undefined };
-  }
-
   const dbRow = await db
-    .select({ role: users.role, email: users.email })
+    .select({ role: users.role, email: users.email, tenantId: users.tenantId })
     .from(users)
     .where(eq(users.clerkId, userId))
     .limit(1);
+
   if (dbRow.length > 0) {
-    return { userId, role: dbRow[0].role as UserRole, email: dbRow[0].email };
+    const raw = dbRow[0].role as RawRole;
+    return {
+      userId,
+      rawRole: raw,
+      role: normalizeRole(raw),
+      tenantId: dbRow[0].tenantId,
+      email: dbRow[0].email,
+    };
   }
 
+  // Last resort: Clerk publicMetadata (newly-invited users before DB sync)
   try {
     const cu = await currentUser();
-    const metaRole = (cu?.publicMetadata as { role?: UserRole } | undefined)?.role;
-    if (metaRole) return { userId, role: metaRole, email: undefined };
+    const metaRole = (cu?.publicMetadata as { role?: RawRole } | undefined)?.role ?? null;
+    return {
+      userId,
+      rawRole: metaRole,
+      role: normalizeRole(metaRole),
+      tenantId: null,
+      email: cu?.primaryEmailAddress?.emailAddress,
+    };
   } catch {
-    /* ignore */
+    return { userId, rawRole: null, role: null, tenantId: null };
   }
-
-  return { userId, role: null as UserRole | null, email: undefined };
 });
 
+/**
+ * Gate a tenant-dashboard route by normalized role. Unchanged signature so all
+ * existing call sites (`requireRole("admin"|"student")`) keep working — a
+ * TENANT_ADMIN now normalizes to "admin", STUDENT to "student".
+ */
 export async function requireRole(allowed: UserRole | UserRole[]) {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
   const allowedList = Array.isArray(allowed) ? allowed : [allowed];
-  if (!user.role || (!allowedList.includes(user.role) && user.role !== "admin")) {
+  // Tenant-admin may access student routes within their own tenant (legacy
+  // "admin-sees-everything" behavior, scoped by tenant middleware in P7-2).
+  const ok = user.role !== null && (allowedList.includes(user.role) || user.role === "admin");
+  if (!ok) redirect("/forbidden");
+  return user;
+}
+
+/** Gate a /super-admin route. Optionally require a minimum super tier. */
+export async function requireSuper(min: SuperRole = "SUPER_SUPPORT") {
+  const user = await getCurrentUser();
+  if (!user) redirect("/admin/login");
+  const order: SuperRole[] = ["SUPER_SUPPORT", "SUPER_STAFF", "SUPER_OWNER"];
+  const have = user.rawRole as SuperRole | null;
+  if (!have || !order.includes(have) || order.indexOf(have) < order.indexOf(min)) {
     redirect("/forbidden");
   }
   return user;

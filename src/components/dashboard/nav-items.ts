@@ -8,7 +8,6 @@ import {
   BookOpen,
   Activity,
 } from "lucide-react";
-import type { UserRole } from "@/lib/auth";
 
 export type NavItem = {
   label: string;
@@ -16,7 +15,7 @@ export type NavItem = {
   icon: LucideIcon;
 };
 
-export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
+export const NAV_ITEMS: Record<"admin" | "student", NavItem[]> = {
   admin: [
     { label: "Overview", href: "/admin", icon: LayoutDashboard },
     { label: "Students", href: "/admin/students", icon: GraduationCap },
@@ -34,7 +33,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
   ],
 };
 
-export const ROLE_LABELS: Record<UserRole, string> = {
+export const ROLE_LABELS: Record<"admin" | "student", string> = {
   admin: "Admin",
   student: "Student",
 };

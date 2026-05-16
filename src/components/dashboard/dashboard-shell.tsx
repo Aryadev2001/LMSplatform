@@ -1,10 +1,9 @@
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { DashboardTopbar } from "./dashboard-topbar";
-import type { UserRole } from "@/lib/auth";
 
 interface DashboardShellProps {
-  role: UserRole;
+  role: "admin" | "student";
   title: string;
   children: React.ReactNode;
 }
