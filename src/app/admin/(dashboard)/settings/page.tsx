@@ -19,6 +19,7 @@ import { initialsOf, formatDate } from "@/lib/format";
 import { AddAdminDialog } from "./add-admin-dialog";
 import { AdminRowActions } from "./admin-row-actions";
 import { TenantBrandingForm } from "./tenant-branding-form";
+import { CustomDomainForm } from "./custom-domain-form";
 import { ShieldCheck, Lock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,8 @@ export default async function AdminSettingsPage() {
             brandPrimaryColor: tenants.brandPrimaryColor,
             brandSecondaryColor: tenants.brandSecondaryColor,
             heroTagline: tenants.heroTagline,
+            customDomain: tenants.customDomain,
+            customDomainStatus: tenants.customDomainStatus,
           })
           .from(tenants)
           .where(eq(tenants.id, myTenantId))
@@ -152,6 +155,25 @@ export default async function AdminSettingsPage() {
                 brandSecondaryColor: tenantRow.brandSecondaryColor,
                 heroTagline: tenantRow.heroTagline ?? "",
               }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Custom domain */}
+      {tenantRow && (
+        <Card className="border-none bg-card shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Custom domain</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Run your portal on your own domain. Requests are reviewed and the
+              DNS is configured manually — it goes live once approved.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <CustomDomainForm
+              currentDomain={tenantRow.customDomain}
+              status={tenantRow.customDomainStatus}
             />
           </CardContent>
         </Card>

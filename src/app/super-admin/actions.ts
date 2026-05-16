@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { clerkClient } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { tenants, users } from "@/db/schema";
+import { tenants, users, domainRequests } from "@/db/schema";
 import { requireSuper, type SuperRole } from "@/lib/auth";
 import { canWrite, canManageTeam } from "@/lib/super";
 import { recordAudit } from "@/lib/audit";
@@ -210,5 +210,120 @@ export async function inviteSuperMember(input: unknown): Promise<Result> {
   });
 
   revalidatePath("/super-admin/team");
+  return { success: true };
+}
+
+const DomainActionSchema = z.object({
+  requestId: z.string().uuid(),
+  notes: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+/**
+ * Super-admin marks a manually-added custom domain as live. Flips the
+ * domain_requests row + the tenant so getTenantFromRequest() will resolve it
+ * (it only honors customDomainStatus === 'CONFIGURED'). Audited.
+ */
+export async function markDomainConfigured(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role — you cannot action domains." };
+  }
+  const parsed = DomainActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const [req] = await db
+    .select()
+    .from(domainRequests)
+    .where(eq(domainRequests.id, parsed.data.requestId))
+    .limit(1);
+  if (!req) return { success: false, error: "Request not found." };
+
+  const [actor] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, me.userId))
+    .limit(1);
+
+  await db
+    .update(domainRequests)
+    .set({
+      status: "CONFIGURED",
+      actionedById: actor?.id ?? null,
+      actionedAt: new Date(),
+      notes: parsed.data.notes || null,
+    })
+    .where(eq(domainRequests.id, req.id));
+
+  await db
+    .update(tenants)
+    .set({
+      customDomain: req.domain,
+      customDomainStatus: "CONFIGURED",
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, req.tenantId));
+
+  await recordAudit({
+    action: "domain.configured",
+    targetType: "tenant",
+    targetId: req.tenantId,
+    metadata: { domain: req.domain, requestId: req.id },
+  });
+
+  revalidatePath("/super-admin/domains");
+  return { success: true };
+}
+
+/** Reject a domain request; clears any pending domain on the tenant. Audited. */
+export async function rejectDomainRequest(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role — you cannot action domains." };
+  }
+  const parsed = DomainActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const [req] = await db
+    .select()
+    .from(domainRequests)
+    .where(eq(domainRequests.id, parsed.data.requestId))
+    .limit(1);
+  if (!req) return { success: false, error: "Request not found." };
+
+  const [actor] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, me.userId))
+    .limit(1);
+
+  await db
+    .update(domainRequests)
+    .set({
+      status: "REJECTED",
+      actionedById: actor?.id ?? null,
+      actionedAt: new Date(),
+      notes: parsed.data.notes || null,
+    })
+    .where(eq(domainRequests.id, req.id));
+
+  // Only clear the tenant's pending domain if it still points at this request
+  // and hasn't already been configured to something live.
+  await db
+    .update(tenants)
+    .set({ customDomain: null, customDomainStatus: "NONE", updatedAt: new Date() })
+    .where(eq(tenants.id, req.tenantId));
+
+  await recordAudit({
+    action: "domain.rejected",
+    targetType: "tenant",
+    targetId: req.tenantId,
+    metadata: { domain: req.domain, requestId: req.id, notes: parsed.data.notes || null },
+  });
+
+  revalidatePath("/super-admin/domains");
   return { success: true };
 }
