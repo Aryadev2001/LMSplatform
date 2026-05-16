@@ -10,11 +10,68 @@ import {
   index,
   uniqueIndex,
   jsonb,
+  doublePrecision,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ---------- Enums ----------
-export const userRoleEnum = pgEnum("user_role", ["admin", "coach", "student"]);
+// Legacy lowercase values kept (Postgres can't drop enum values); phase-7
+// adds the multi-tenant role set. Existing data is backfilled admin→TENANT_ADMIN,
+// student→STUDENT in the separate backfill step.
+export const userRoleEnum = pgEnum("user_role", [
+  "admin",
+  "coach",
+  "student",
+  "SUPER_OWNER",
+  "SUPER_STAFF",
+  "SUPER_SUPPORT",
+  "TENANT_ADMIN",
+  "INSTRUCTOR",
+  "STUDENT",
+]);
+
+// ---------- Phase 7: multi-tenant enums ----------
+export const tenantStatusEnum = pgEnum("tenant_status", [
+  "ACTIVE",
+  "SUSPENDED",
+  "TRIAL",
+  "CHURNED",
+]);
+
+export const customDomainStatusEnum = pgEnum("custom_domain_status", [
+  "NONE",
+  "REQUESTED",
+  "CONFIGURED",
+]);
+
+export const referralTierEnum = pgEnum("referral_tier", [
+  "NONE",
+  "BRONZE",
+  "SILVER",
+  "GOLD",
+  "PLATINUM",
+]);
+
+export const referralStatusEnum = pgEnum("referral_status", [
+  "PENDING",
+  "ACTIVATED",
+  "EXPIRED",
+]);
+
+export const pointsTxnTypeEnum = pgEnum("points_transaction_type", [
+  "EARNED_REFERRAL",
+  "REDEEMED_AT_CHECKOUT",
+  "EXPIRED",
+  "ADMIN_ADJUSTMENT",
+]);
+
+export const domainRequestStatusEnum = pgEnum("domain_request_status", [
+  "PENDING",
+  "IN_PROGRESS",
+  "CONFIGURED",
+  "REJECTED",
+]);
 
 export const enrollmentStatusEnum = pgEnum("enrollment_status", [
   "pending", // form submitted, not paid
@@ -60,6 +117,49 @@ export const courseStatusEnum = pgEnum("course_status", [
   "archived",
 ]);
 
+// ---------- Phase 7: Tenant ----------
+export const tenants = pgTable(
+  "tenants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: varchar("slug", { length: 63 }).notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
+    logoUrl: text("logo_url"),
+    brandPrimaryColor: varchar("brand_primary_color", { length: 16 })
+      .notNull()
+      .default("#8CC63F"),
+    brandSecondaryColor: varchar("brand_secondary_color", { length: 16 })
+      .notNull()
+      .default("#1AADE0"),
+    heroTagline: varchar("hero_tagline", { length: 240 }),
+    customDomain: varchar("custom_domain", { length: 253 }),
+    customDomainStatus: customDomainStatusEnum("custom_domain_status")
+      .notNull()
+      .default("NONE"),
+    // Payments — each tenant uses their own Razorpay (keys encrypted at rest)
+    razorpayKeyId: varchar("razorpay_key_id", { length: 128 }),
+    razorpayKeySecret: text("razorpay_key_secret"),
+    // Referral config
+    referralPointsPercent: doublePrecision("referral_points_percent")
+      .notNull()
+      .default(5.0),
+    referralRedeemMaxPercent: doublePrecision("referral_redeem_max_percent")
+      .notNull()
+      .default(50.0),
+    referralEnabled: boolean("referral_enabled").notNull().default(true),
+    // Lifecycle
+    status: tenantStatusEnum("status").notNull().default("ACTIVE"),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("tenants_slug_idx").on(t.slug),
+    uniqueIndex("tenants_custom_domain_idx").on(t.customDomain),
+    index("tenants_status_idx").on(t.status),
+  ],
+);
+
 // ---------- Users (mirror of Clerk) ----------
 export const users = pgTable(
   "users",
@@ -72,6 +172,18 @@ export const users = pgTable(
     role: userRoleEnum("role").notNull(),
     isSuperAdmin: boolean("is_super_admin").notNull().default(false),
     permissions: text("permissions").array().notNull().default([]),
+    // Phase 7 — tenant scoping (NULL only for SUPER_* users)
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "cascade",
+    }),
+    // Phase 7 — referral
+    referralCode: varchar("referral_code", { length: 32 }),
+    referredById: uuid("referred_by_id").references((): AnyPgColumn => users.id, {
+      onDelete: "set null",
+    }),
+    pointsBalance: integer("points_balance").notNull().default(0),
+    currentTier: referralTierEnum("current_tier").notNull().default("NONE"),
+    tierUnlockedAt: jsonb("tier_unlocked_at"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -79,6 +191,8 @@ export const users = pgTable(
     uniqueIndex("users_clerk_id_idx").on(t.clerkId),
     uniqueIndex("users_email_idx").on(t.email),
     index("users_role_idx").on(t.role),
+    index("users_tenant_idx").on(t.tenantId),
+    uniqueIndex("users_referral_code_idx").on(t.referralCode),
   ],
 );
 
@@ -102,10 +216,24 @@ export const programs = pgTable(
     requiresApplication: boolean("requires_application").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
     stripePriceId: varchar("stripe_price_id", { length: 128 }),
+    // Phase 7 — multi-tenant / master-course
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "cascade",
+    }), // NULL only for master courses in EDT catalog
+    isMasterCourse: boolean("is_master_course").notNull().default(false),
+    sourceCourseId: uuid("source_course_id").references(
+      (): AnyPgColumn => programs.id,
+      { onDelete: "set null" },
+    ),
+    tierUnlockEligible: boolean("tier_unlock_eligible").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [uniqueIndex("programs_slug_idx").on(t.slug)],
+  (t) => [
+    uniqueIndex("programs_slug_idx").on(t.slug),
+    index("programs_tenant_idx").on(t.tenantId),
+    index("programs_source_idx").on(t.sourceCourseId),
+  ],
 );
 
 // ---------- Modules ----------
@@ -242,12 +370,18 @@ export const payments = pgTable(
     paymentMethodLabel: varchar("payment_method_label", { length: 60 }),
     receiptUrl: text("receipt_url"),
     stripeSyncedAt: timestamp("stripe_synced_at", { withTimezone: true }),
+    // Phase 7 — tenant scoping + points redeemed at checkout
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "cascade",
+    }),
+    pointsRedeemed: integer("points_redeemed").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("payments_enrollment_idx").on(t.enrollmentId),
     index("payments_student_idx").on(t.studentUserId),
     index("payments_status_idx").on(t.status),
+    index("payments_tenant_idx").on(t.tenantId),
     uniqueIndex("payments_pi_idx").on(t.stripePaymentIntentId),
   ],
 );
@@ -450,5 +584,155 @@ export const diagnosticSubmissions = pgTable(
     index("diagnostic_user_idx").on(t.userId),
     index("diagnostic_created_idx").on(t.createdAt),
     index("diagnostic_stage_idx").on(t.stage),
+  ],
+);
+
+// ============================================================
+// Phase 7 — Multi-tenant tables
+// ============================================================
+
+// Tenant admin configures which course unlocks at which referral tier
+export const tierRewards = pgTable(
+  "tier_rewards",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    tier: referralTierEnum("tier").notNull(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("tier_rewards_unique").on(t.tenantId, t.tier, t.courseId),
+    index("tier_rewards_tenant_idx").on(t.tenantId),
+  ],
+);
+
+// Referral link between two users within a tenant
+export const referrals = pgTable(
+  "referrals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    referrerId: uuid("referrer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    referredUserId: uuid("referred_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: referralStatusEnum("status").notNull().default("PENDING"),
+    firstPurchaseAt: timestamp("first_purchase_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("referrals_pair_unique").on(t.referrerId, t.referredUserId),
+    index("referrals_tenant_idx").on(t.tenantId),
+    index("referrals_referrer_idx").on(t.referrerId),
+  ],
+);
+
+// Append-only points ledger (User.pointsBalance is a cache of this)
+export const pointsTransactions = pgTable(
+  "points_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    type: pointsTxnTypeEnum("type").notNull(),
+    pointsDelta: integer("points_delta").notNull(), // +earn / -redeem
+    relatedPaymentId: uuid("related_payment_id").references(() => payments.id, {
+      onDelete: "set null",
+    }),
+    relatedReferralId: uuid("related_referral_id").references(() => referrals.id, {
+      onDelete: "set null",
+    }),
+    note: varchar("note", { length: 300 }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("points_txn_user_idx").on(t.userId),
+    index("points_txn_tenant_idx").on(t.tenantId),
+    index("points_txn_expires_idx").on(t.expiresAt),
+  ],
+);
+
+// Manual DNS request queue (super-admin actions it by hand in Vercel)
+export const domainRequests = pgTable(
+  "domain_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    domain: varchar("domain", { length: 253 }).notNull(),
+    status: domainRequestStatusEnum("status").notNull().default("PENDING"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+    actionedById: uuid("actioned_by_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    actionedAt: timestamp("actioned_at", { withTimezone: true }),
+    notes: varchar("notes", { length: 500 }),
+  },
+  (t) => [
+    index("domain_requests_tenant_idx").on(t.tenantId),
+    index("domain_requests_status_idx").on(t.status),
+  ],
+);
+
+// Record of master-course pushes into tenant catalogs
+export const coursePushHistory = pgTable(
+  "course_push_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    masterCourseId: uuid("master_course_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    targetTenantId: uuid("target_tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    pushedById: uuid("pushed_by_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    copyCourseId: uuid("copy_course_id").references(() => programs.id, {
+      onDelete: "set null",
+    }),
+    pushedAt: timestamp("pushed_at", { withTimezone: true }).defaultNow().notNull(),
+    syncedAt: timestamp("synced_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("course_push_master_idx").on(t.masterCourseId),
+    index("course_push_tenant_idx").on(t.targetTenantId),
+  ],
+);
+
+// Audit log — every super-admin write + sensitive tenant-admin action
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    actorRole: userRoleEnum("actor_role").notNull(),
+    action: varchar("action", { length: 120 }).notNull(),
+    targetType: varchar("target_type", { length: 60 }).notNull(),
+    targetId: varchar("target_id", { length: 80 }).notNull(),
+    metadataJson: jsonb("metadata_json"),
+    ipAddress: varchar("ip_address", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("audit_actor_idx").on(t.actorUserId),
+    index("audit_created_idx").on(t.createdAt),
   ],
 );
