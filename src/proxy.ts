@@ -1,5 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import {
+  parseTenantHost,
+  TENANT_SLUG_HEADER,
+  TENANT_DOMAIN_HEADER,
+} from "@/lib/tenant";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -21,7 +26,21 @@ const isPublicRoute = createRouteMatcher([
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isPublicRoute(req)) return;
+  // Resolve tenant CONTEXT from the host (pure string parse, no DB) and pass
+  // it downstream as request headers. The DB lookup happens in the cached
+  // server helper getTenantFromRequest(), keeping middleware fast.
+  const parsed = parseTenantHost(req.headers.get("host"));
+  const slug = parsed.kind === "subdomain" ? parsed.slug : "";
+  const domain = parsed.kind === "custom" ? parsed.domain : "";
+
+  const pass = () => {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set(TENANT_SLUG_HEADER, slug);
+    requestHeaders.set(TENANT_DOMAIN_HEADER, domain);
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  };
+
+  if (isPublicRoute(req)) return pass();
 
   const { userId, redirectToSignIn } = await auth();
 
@@ -37,6 +56,8 @@ export default clerkMiddleware(async (auth, req) => {
   // requireRole() (DB-backed), so it works even without Clerk session-token
   // customization.
   if (!userId) return redirectToSignIn({ returnBackUrl: req.url });
+
+  return pass();
 });
 
 export const config = {
