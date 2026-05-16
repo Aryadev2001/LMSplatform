@@ -35,27 +35,39 @@ export function CreateTenantDialog() {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [tagline, setTagline] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminName, setAdminName] = useState("");
 
   function onSubmit() {
     startTransition(async () => {
       const r = await createTenant({
         name,
         slug: slug || slugify(name),
+        adminEmail,
+        adminName,
         heroTagline: tagline,
       });
       if (r.success) {
-        toast.success("Tenant created");
+        toast.success(
+          r.invited
+            ? `Tenant created — access invite emailed to ${r.adminEmail}`
+            : `Tenant created — ${r.adminEmail} now has admin access (sign in at /admin/login)`,
+        );
         setOpen(false);
         setName("");
         setSlug("");
         setSlugTouched(false);
         setTagline("");
+        setAdminEmail("");
+        setAdminName("");
         router.refresh();
       } else {
         toast.error(r.error);
       }
     });
   }
+
+  const emailValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail.trim());
 
   const effectiveSlug = slugTouched ? slug : slugify(name);
 
@@ -97,6 +109,29 @@ export function CreateTenantDialog() {
             />
           </div>
           <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Tenant admin email</Label>
+            <Input
+              type="email"
+              value={adminEmail}
+              onChange={(e) => setAdminEmail(e.target.value)}
+              placeholder="owner@acme.com"
+              className="h-10 rounded-xl"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              They receive a magic-link invite to their tenant dashboard at this
+              address. If they already have an account, access is granted instantly.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Admin name (optional)</Label>
+            <Input
+              value={adminName}
+              onChange={(e) => setAdminName(e.target.value)}
+              placeholder="Jane Doe"
+              className="h-10 rounded-xl"
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label className="text-xs font-medium">Hero tagline (optional)</Label>
             <Input
               value={tagline}
@@ -113,11 +148,11 @@ export function CreateTenantDialog() {
           </Button>
           <Button
             onClick={onSubmit}
-            disabled={pending || name.trim().length < 2}
+            disabled={pending || name.trim().length < 2 || !emailValid}
             className="rounded-xl"
           >
             {pending && <Loader2 className="size-4 animate-spin" />}
-            Create
+            Create & invite
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { db } from "../src/db/client";
 import { tenants, users, programs, payments } from "../src/db/schema";
-import { sql, isNull, and, ne } from "drizzle-orm";
+import { sql, isNull, and, ne, eq } from "drizzle-orm";
 
 async function run() {
   console.log("\n=== Phase-7 backfill verification ===\n");
@@ -28,10 +28,12 @@ async function run() {
   const [{ pc }] = await db
     .select({ pc: sql<number>`count(*)::int` })
     .from(programs);
+  // NULL tenantId is valid ONLY for master courses (P7-7). A non-master
+  // program with no tenant is the actual bug we're guarding against.
   const [{ pNull }] = await db
     .select({ pNull: sql<number>`count(*)::int` })
     .from(programs)
-    .where(isNull(programs.tenantId));
+    .where(and(isNull(programs.tenantId), eq(programs.isMasterCourse, false)));
   const [{ payc }] = await db.select({ payc: sql<number>`count(*)::int` }).from(payments);
   const [{ payNull }] = await db
     .select({ payNull: sql<number>`count(*)::int` })
@@ -39,7 +41,7 @@ async function run() {
     .where(isNull(payments.tenantId));
 
   console.log(`\nScoping:`);
-  console.log(`  programs: ${pc} total, ${pNull} with NULL tenantId (expect 0 — no master courses yet)`);
+  console.log(`  programs: ${pc} total, ${pNull} non-master with NULL tenantId (expect 0)`);
   console.log(`  payments: ${payc} total, ${payNull} with NULL tenantId (expect 0)`);
 
   // Regression checks
@@ -58,8 +60,10 @@ async function run() {
     `  non-super users with NULL tenantId: ${orphanUsers} (expect 0 — only super users are tenant-less)`,
   );
 
+  // Post go-live the platform is multi-tenant; "exactly one tenant" is no
+  // longer an invariant. What must hold: the founding 'edt' tenant exists.
   const pass =
-    t.length === 1 &&
+    t.some((x) => x.slug === "edt") &&
     pNull === 0 &&
     payNull === 0 &&
     orphanUsers === 0 &&

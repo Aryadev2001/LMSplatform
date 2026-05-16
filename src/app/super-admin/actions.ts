@@ -11,7 +11,7 @@ import {
   pushMasterToTenant,
   syncMasterToAllTenants,
 } from "@/lib/course-push";
-import { requireSuper, type SuperRole } from "@/lib/auth";
+import { requireSuper, type SuperRole, CANONICAL_ADMIN } from "@/lib/auth";
 import { canWrite, canManageTeam } from "@/lib/super";
 import { recordAudit } from "@/lib/audit";
 import { RESERVED_SUBDOMAINS } from "@/lib/tenant";
@@ -35,10 +35,72 @@ const slugSchema = z
 const CreateTenantSchema = z.object({
   name: z.string().trim().min(2).max(200),
   slug: slugSchema,
+  adminEmail: z.string().trim().toLowerCase().email("Enter a valid admin email"),
+  adminName: z.string().trim().max(200).optional().or(z.literal("")),
   brandPrimaryColor: z.string().regex(HEX).optional(),
   brandSecondaryColor: z.string().regex(HEX).optional(),
   heroTagline: z.string().trim().max(240).optional().or(z.literal("")),
 });
+
+/**
+ * Provision the tenant's first admin. Existing Clerk user → promote + sync
+ * the DB row immediately (can sign in now). New email → Clerk magic-link
+ * invitation carrying { role, tenantId } so the webhook scopes them on
+ * accept. Returns whether an email invite was sent.
+ */
+async function provisionTenantAdmin(
+  email: string,
+  fullName: string | null,
+  tenantId: string,
+): Promise<{ invited: boolean }> {
+  const clerk = await clerkClient();
+  const existing = await clerk.users.getUserList({ emailAddress: [email] });
+  const clerkUser = existing.data[0];
+
+  if (clerkUser) {
+    await clerk.users.updateUserMetadata(clerkUser.id, {
+      publicMetadata: {
+        ...(clerkUser.publicMetadata ?? {}),
+        role: CANONICAL_ADMIN,
+        tenantId,
+      },
+    });
+    const [dbRow] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkUser.id))
+      .limit(1);
+    if (!dbRow) {
+      await db.insert(users).values({
+        clerkId: clerkUser.id,
+        email,
+        fullName: fullName || "Tenant Admin",
+        role: CANONICAL_ADMIN,
+        isSuperAdmin: false,
+        tenantId,
+      });
+    } else {
+      await db
+        .update(users)
+        .set({
+          role: CANONICAL_ADMIN,
+          isSuperAdmin: false,
+          tenantId,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.clerkId, clerkUser.id));
+    }
+    return { invited: false };
+  }
+
+  await clerk.invitations.createInvitation({
+    emailAddress: email,
+    redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/post-login`,
+    publicMetadata: { role: CANONICAL_ADMIN, tenantId },
+    notify: true,
+  });
+  return { invited: true };
+}
 
 const UpdateTenantSchema = z.object({
   tenantId: z.string().uuid(),
@@ -58,7 +120,11 @@ const InviteMemberSchema = z.object({
   superRole: z.enum(["SUPER_OWNER", "SUPER_STAFF", "SUPER_SUPPORT"]),
 });
 
-export async function createTenant(input: unknown): Promise<Result> {
+type CreateTenantResult =
+  | { success: true; invited: boolean; adminEmail: string }
+  | { success: false; error: string };
+
+export async function createTenant(input: unknown): Promise<CreateTenantResult> {
   const me = await requireSuper(); // any super may reach here…
   if (!canWrite(me.rawRole as SuperRole)) {
     return { success: false, error: "Read-only role — you cannot create tenants." };
@@ -101,8 +167,39 @@ export async function createTenant(input: unknown): Promise<Result> {
     return { success: false, error: "Could not record audit entry — tenant not created." };
   }
 
+  // Provision the tenant's first admin so they get dashboard access by email.
+  let invited = false;
+  try {
+    const r = await provisionTenantAdmin(
+      data.adminEmail,
+      data.adminName || null,
+      row.id,
+    );
+    invited = r.invited;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // A pending invite / already-member for this email is fine — the access
+    // email is (or was) on its way. Any other failure → atomic rollback so
+    // the super can fix the email and retry cleanly.
+    if (!/already|exists|duplicate/i.test(msg)) {
+      await db.delete(tenants).where(eq(tenants.id, row.id));
+      return {
+        success: false,
+        error: `Tenant not created — could not invite ${data.adminEmail}: ${msg}`,
+      };
+    }
+    invited = true;
+  }
+
+  await recordAudit({
+    action: "tenant.admin_invited",
+    targetType: "tenant",
+    targetId: row.id,
+    metadata: { adminEmail: data.adminEmail, invited },
+  });
+
   revalidatePath("/super-admin/tenants");
-  return { success: true };
+  return { success: true, invited, adminEmail: data.adminEmail };
 }
 
 export async function updateTenant(input: unknown): Promise<Result> {
