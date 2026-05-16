@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     try {
       const invitation = await clerk.invitations.createInvitation({
         emailAddress: email,
-        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/admin`,
+        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/accept-invite`,
         publicMetadata: { role: CANONICAL_ADMIN },
         notify: true,
       });

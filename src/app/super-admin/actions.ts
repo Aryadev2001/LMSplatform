@@ -95,7 +95,7 @@ async function provisionTenantAdmin(
 
   await clerk.invitations.createInvitation({
     emailAddress: email,
-    redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/post-login`,
+    redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/accept-invite`,
     publicMetadata: { role: CANONICAL_ADMIN, tenantId },
     notify: true,
   });
@@ -292,7 +292,7 @@ export async function inviteSuperMember(input: unknown): Promise<Result> {
     try {
       await clerk.invitations.createInvitation({
         emailAddress: email,
-        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/post-login`,
+        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/accept-invite`,
         publicMetadata: { role: superRole },
         notify: true,
       });
