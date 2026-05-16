@@ -3,11 +3,12 @@
 import { z } from "zod";
 import { clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/db/client";
-import { users } from "@/db/schema";
+import { users, tenants } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireRole, getCurrentUser, CANONICAL_ADMIN } from "@/lib/auth";
 import { ADMIN_PERMISSIONS, type AdminPermission } from "@/lib/permissions";
+import { recordAudit } from "@/lib/audit";
 
 async function requireManageAdmins() {
   const me = await requireRole("admin");
@@ -151,4 +152,58 @@ export async function removeAdmin(targetUserId: string) {
 
   revalidatePath("/admin/settings");
   return { success: true as const };
+}
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+const BrandingSchema = z.object({
+  logoUrl: z.string().url().max(2048).optional().or(z.literal("")),
+  brandPrimaryColor: z.string().regex(HEX, "Use a #rrggbb hex color"),
+  brandSecondaryColor: z.string().regex(HEX, "Use a #rrggbb hex color"),
+  heroTagline: z.string().trim().max(240).optional().or(z.literal("")),
+});
+
+/**
+ * Tenant-admin updates THEIR OWN tenant's whitelabel. The tenant scope is
+ * derived from the session — never from the client — so a tenant admin can
+ * never write another tenant's branding (acceptance #5).
+ */
+export async function updateMyTenantBranding(
+  input: unknown,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const me = await requireRole("admin");
+  if (!me.tenantId) {
+    return { success: false, error: "Your account is not attached to a tenant." };
+  }
+  const parsed = BrandingSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const d = parsed.data;
+
+  await db
+    .update(tenants)
+    .set({
+      logoUrl: d.logoUrl ? d.logoUrl : null,
+      brandPrimaryColor: d.brandPrimaryColor,
+      brandSecondaryColor: d.brandSecondaryColor,
+      heroTagline: d.heroTagline ? d.heroTagline : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, me.tenantId));
+
+  await recordAudit({
+    action: "tenant.branding.update",
+    targetType: "tenant",
+    targetId: me.tenantId,
+    metadata: {
+      brandPrimaryColor: d.brandPrimaryColor,
+      brandSecondaryColor: d.brandSecondaryColor,
+      hasLogo: !!d.logoUrl,
+    },
+  });
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/", "layout");
+  return { success: true };
 }

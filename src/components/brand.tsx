@@ -5,8 +5,8 @@ interface BrandMarkProps {
 }
 
 /**
- * EDT mark — gradient rounded square with "E" cut-out.
- * Swap for the official EDT_Logo PNG once supplied.
+ * EDT mark — gradient rounded square with "E" cut-out. Uses the brand CSS
+ * vars so it auto-whitelabels (TenantBrandStyle rebinds --brand-green/blue).
  */
 export function BrandMark({ className }: BrandMarkProps) {
   return (
@@ -19,8 +19,8 @@ export function BrandMark({ className }: BrandMarkProps) {
     >
       <defs>
         <linearGradient id="edt-mark" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#8CC63F" />
-          <stop offset="1" stopColor="#1AADE0" />
+          <stop stopColor="var(--brand-green)" />
+          <stop offset="1" stopColor="var(--brand-blue)" />
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="8" fill="url(#edt-mark)" />
@@ -36,16 +36,38 @@ export function BrandMark({ className }: BrandMarkProps) {
 interface BrandProps {
   className?: string;
   wordmarkClassName?: string;
-  /** show the full legal name instead of "EDT" */
+  /** show the full legal name instead of the short wordmark */
   full?: boolean;
+  /** tenant logo — when set, replaces the mark+wordmark with the image */
+  logoUrl?: string | null;
+  /** tenant display name (logo alt + wordmark when whitelabeled) */
+  name?: string | null;
 }
 
-export function Brand({ className, wordmarkClassName, full = false }: BrandProps) {
+export function Brand({
+  className,
+  wordmarkClassName,
+  full = false,
+  logoUrl,
+  name,
+}: BrandProps) {
+  if (logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={logoUrl}
+        alt={name ?? "Logo"}
+        className={cn("h-7 w-auto object-contain", className)}
+      />
+    );
+  }
+
+  const label = name ?? (full ? "Euro Digital Technologies" : "EDT");
   return (
     <div className={cn("inline-flex items-center gap-2 text-foreground", className)}>
       <BrandMark />
       <span className={cn("text-sm font-semibold tracking-tight", wordmarkClassName)}>
-        {full ? "Euro Digital Technologies" : "EDT"}
+        {label}
       </span>
     </div>
   );

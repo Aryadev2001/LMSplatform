@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { users } from "@/db/schema";
+import { users, tenants } from "@/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { PERMISSION_LABELS, type AdminPermission, hasPermission } from "@/lib/pe
 import { initialsOf, formatDate } from "@/lib/format";
 import { AddAdminDialog } from "./add-admin-dialog";
 import { AdminRowActions } from "./admin-row-actions";
+import { TenantBrandingForm } from "./tenant-branding-form";
 import { ShieldCheck, Lock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,23 @@ export default async function AdminSettingsPage() {
 
   const profile = meRow[0];
   const canManageAdmins = hasPermission(profile, "manage_admins");
+
+  const myTenantId = me?.tenantId ?? null;
+  const tenantRow = myTenantId
+    ? (
+        await db
+          .select({
+            name: tenants.name,
+            logoUrl: tenants.logoUrl,
+            brandPrimaryColor: tenants.brandPrimaryColor,
+            brandSecondaryColor: tenants.brandSecondaryColor,
+            heroTagline: tenants.heroTagline,
+          })
+          .from(tenants)
+          .where(eq(tenants.id, myTenantId))
+          .limit(1)
+      )[0]
+    : undefined;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -115,6 +133,29 @@ export default async function AdminSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Whitelabel / branding */}
+      {tenantRow && (
+        <Card className="border-none bg-card shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Branding</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Your logo and colors. These apply across your students&apos; and
+              your own dashboards instantly.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <TenantBrandingForm
+              initial={{
+                logoUrl: tenantRow.logoUrl,
+                brandPrimaryColor: tenantRow.brandPrimaryColor,
+                brandSecondaryColor: tenantRow.brandSecondaryColor,
+                heroTagline: tenantRow.heroTagline ?? "",
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Admins management */}
       <Card className="border-none bg-card shadow-card">

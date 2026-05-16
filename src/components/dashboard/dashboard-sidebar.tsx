@@ -16,14 +16,17 @@ import {
 } from "@/components/ui/sidebar";
 import { BrandMark } from "@/components/brand";
 import { NAV_ITEMS, ROLE_LABELS, type DashRole } from "./nav-items";
+import type { TenantBrand } from "./dashboard-shell";
 
 interface DashboardSidebarProps {
   role: DashRole;
+  brand?: TenantBrand;
 }
 
-export function DashboardSidebar({ role }: DashboardSidebarProps) {
+export function DashboardSidebar({ role, brand }: DashboardSidebarProps) {
   const items = NAV_ITEMS[role];
   const roleLabel = ROLE_LABELS[role];
+  const brandName = brand?.name ?? "EDT";
   const pathname = usePathname();
   const isActiveLink = (href: string) => {
     if (pathname === href) return true;
@@ -36,9 +39,18 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
     <Sidebar collapsible="icon" className="border-r border-black/5">
       <SidebarHeader>
         <div className="flex items-center gap-2.5 px-2 py-3">
-          <BrandMark className="size-8 shrink-0 text-foreground" />
+          {brand?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={brand.logoUrl}
+              alt={brandName}
+              className="size-8 shrink-0 rounded-md object-contain"
+            />
+          ) : (
+            <BrandMark className="size-8 shrink-0 text-foreground" />
+          )}
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-semibold tracking-tight">EDT</span>
+            <span className="truncate text-sm font-semibold tracking-tight">{brandName}</span>
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
               {roleLabel}
             </span>
