@@ -15,10 +15,10 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { BrandMark } from "@/components/brand";
-import { NAV_ITEMS, ROLE_LABELS } from "./nav-items";
+import { NAV_ITEMS, ROLE_LABELS, type DashRole } from "./nav-items";
 
 interface DashboardSidebarProps {
-  role: "admin" | "student";
+  role: DashRole;
 }
 
 export function DashboardSidebar({ role }: DashboardSidebarProps) {

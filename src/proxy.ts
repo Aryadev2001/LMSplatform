@@ -23,7 +23,8 @@ const isPublicRoute = createRouteMatcher([
   "/api/blob/upload",
 ]);
 
-const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
+// /super-admin uses the same dedicated console login as /admin.
+const isAdminRoute = createRouteMatcher(["/admin(.*)", "/super-admin(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
   // Resolve tenant CONTEXT from the host (pure string parse, no DB) and pass

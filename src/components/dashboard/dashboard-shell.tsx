@@ -1,9 +1,10 @@
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { DashboardTopbar } from "./dashboard-topbar";
+import type { DashRole } from "./nav-items";
 
 interface DashboardShellProps {
-  role: "admin" | "student";
+  role: DashRole;
   title: string;
   children: React.ReactNode;
 }

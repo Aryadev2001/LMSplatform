@@ -7,7 +7,12 @@ import {
   Settings,
   BookOpen,
   Activity,
+  Building2,
+  Users2,
+  ScrollText,
 } from "lucide-react";
+
+export type DashRole = "admin" | "student" | "super";
 
 export type NavItem = {
   label: string;
@@ -15,7 +20,7 @@ export type NavItem = {
   icon: LucideIcon;
 };
 
-export const NAV_ITEMS: Record<"admin" | "student", NavItem[]> = {
+export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
   admin: [
     { label: "Overview", href: "/admin", icon: LayoutDashboard },
     { label: "Students", href: "/admin/students", icon: GraduationCap },
@@ -31,9 +36,16 @@ export const NAV_ITEMS: Record<"admin" | "student", NavItem[]> = {
     { label: "My Diagnostic", href: "/student/diagnostic", icon: Activity },
     { label: "Settings", href: "/student/settings", icon: Settings },
   ],
+  super: [
+    { label: "Overview", href: "/super-admin", icon: LayoutDashboard },
+    { label: "Tenants", href: "/super-admin/tenants", icon: Building2 },
+    { label: "Team", href: "/super-admin/team", icon: Users2 },
+    { label: "Audit Log", href: "/super-admin/audit", icon: ScrollText },
+  ],
 };
 
-export const ROLE_LABELS: Record<"admin" | "student", string> = {
+export const ROLE_LABELS: Record<DashRole, string> = {
   admin: "Admin",
   student: "Student",
+  super: "Super Admin",
 };
