@@ -85,28 +85,47 @@ export default async function TenantDetailPage({
               <CardTitle className="text-sm">Payment gateway</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              {t.razorpayKeyId && t.razorpayKeySecret ? (
-                <>
-                  <Badge variant="default">Razorpay connected</Badge>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    {t.razorpayKeyId.length > 12
-                      ? `${t.razorpayKeyId.slice(0, 12)}…${t.razorpayKeyId.slice(-4)}`
-                      : t.razorpayKeyId}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Secret is encrypted and not visible here — supervision only.
-                    The tenant manages their own keys.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Badge variant="outline">Not connected</Badge>
-                  <p className="text-[11px] text-muted-foreground">
-                    The tenant hasn&apos;t connected a payment gateway yet. They
-                    do this from their own dashboard → Settings → Payment gateway.
-                  </p>
-                </>
-              )}
+              {(() => {
+                const rzp = !!t.razorpayKeyId && !!t.razorpayKeySecret;
+                const stripe = !!t.stripePublishableKey && !!t.stripeSecretKey;
+                const id = stripe
+                  ? t.stripePublishableKey!
+                  : rzp
+                    ? t.razorpayKeyId!
+                    : "";
+                const masked =
+                  id.length > 12 ? `${id.slice(0, 12)}…${id.slice(-4)}` : id;
+                if (!rzp && !stripe) {
+                  return (
+                    <>
+                      <Badge variant="outline">Not connected</Badge>
+                      <p className="text-[11px] text-muted-foreground">
+                        The tenant hasn&apos;t connected a payment gateway yet.
+                        They do this from their own dashboard → Settings →
+                        Payment gateway.
+                      </p>
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {t.paymentProvider && (
+                        <Badge variant="default" className="capitalize">
+                          {t.paymentProvider} active
+                        </Badge>
+                      )}
+                      {rzp && <Badge variant="secondary">Razorpay</Badge>}
+                      {stripe && <Badge variant="secondary">Stripe</Badge>}
+                    </div>
+                    <p className="font-mono text-xs text-muted-foreground">{masked}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Secrets are encrypted and not visible here — supervision
+                      only. The tenant manages their own keys.
+                    </p>
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
           <Card>

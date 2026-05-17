@@ -96,6 +96,9 @@ export default async function AdminSettingsPage() {
             customDomainStatus: tenants.customDomainStatus,
             razorpayKeyId: tenants.razorpayKeyId,
             razorpayKeySecret: tenants.razorpayKeySecret,
+            stripePublishableKey: tenants.stripePublishableKey,
+            stripeSecretKey: tenants.stripeSecretKey,
+            paymentProvider: tenants.paymentProvider,
           })
           .from(tenants)
           .where(eq(tenants.id, myTenantId))
@@ -215,8 +218,15 @@ export default async function AdminSettingsPage() {
           </CardHeader>
           <CardContent>
             <PaymentGatewayForm
-              connectedKeyId={tenantRow.razorpayKeyId}
-              hasSecret={!!tenantRow.razorpayKeySecret}
+              provider={tenantRow.paymentProvider}
+              razorpayKeyId={tenantRow.razorpayKeyId}
+              razorpayConnected={
+                !!tenantRow.razorpayKeyId && !!tenantRow.razorpayKeySecret
+              }
+              stripePublishableKey={tenantRow.stripePublishableKey}
+              stripeConnected={
+                !!tenantRow.stripePublishableKey && !!tenantRow.stripeSecretKey
+              }
             />
           </CardContent>
         </Card>

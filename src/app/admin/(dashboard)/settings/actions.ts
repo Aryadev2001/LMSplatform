@@ -413,6 +413,7 @@ export async function connectRazorpay(
     .set({
       razorpayKeyId: parsed.data.keyId,
       razorpayKeySecret: encrypted,
+      paymentProvider: "razorpay",
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, me.tenantId));
@@ -435,9 +436,20 @@ export async function disconnectRazorpay(): Promise<
   if (!me.tenantId) {
     return { success: false, error: "Your account is not attached to a tenant." };
   }
+  const [cur] = await db
+    .select({ provider: tenants.paymentProvider })
+    .from(tenants)
+    .where(eq(tenants.id, me.tenantId))
+    .limit(1);
   await db
     .update(tenants)
-    .set({ razorpayKeyId: null, razorpayKeySecret: null, updatedAt: new Date() })
+    .set({
+      razorpayKeyId: null,
+      razorpayKeySecret: null,
+      // Only clear the active provider if it was Razorpay.
+      ...(cur?.provider === "razorpay" ? { paymentProvider: null } : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(tenants.id, me.tenantId));
 
   await recordAudit({
@@ -445,6 +457,106 @@ export async function disconnectRazorpay(): Promise<
     targetType: "tenant",
     targetId: me.tenantId,
     metadata: { provider: "razorpay" },
+  });
+
+  revalidatePath("/admin/settings");
+  return { success: true };
+}
+
+const StripeSchema = z.object({
+  publishableKey: z
+    .string()
+    .trim()
+    .regex(/^pk_(test|live)_[A-Za-z0-9]+$/, "Publishable key looks like pk_live_xxxx"),
+  secretKey: z
+    .string()
+    .trim()
+    .regex(/^sk_(test|live)_[A-Za-z0-9]+$/, "Secret key looks like sk_live_xxxx")
+    .max(256),
+});
+
+/**
+ * A tenant connects THEIR OWN Stripe. Same posture as Razorpay: session
+ * tenant-scoped, secret key encrypted at rest, publishable key is not secret
+ * (stored plaintext), super-admin only sees connection status.
+ */
+export async function connectStripe(
+  input: unknown,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const me = await requireRole("admin");
+  if (!me.tenantId) {
+    return { success: false, error: "Your account is not attached to a tenant." };
+  }
+  if (!encryptionAvailable()) {
+    return {
+      success: false,
+      error:
+        "Secret encryption is not configured on the server — set APP_ENCRYPTION_KEY (or CLERK_SECRET_KEY). Keys were NOT saved.",
+    };
+  }
+  const parsed = StripeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  let encrypted: string;
+  try {
+    encrypted = encryptSecret(parsed.data.secretKey);
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Could not encrypt the secret.",
+    };
+  }
+
+  await db
+    .update(tenants)
+    .set({
+      stripePublishableKey: parsed.data.publishableKey,
+      stripeSecretKey: encrypted,
+      paymentProvider: "stripe",
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, me.tenantId));
+
+  await recordAudit({
+    action: "payment_gateway.connect",
+    targetType: "tenant",
+    targetId: me.tenantId,
+    metadata: { provider: "stripe", publishableKey: parsed.data.publishableKey },
+  });
+
+  revalidatePath("/admin/settings");
+  return { success: true };
+}
+
+export async function disconnectStripe(): Promise<
+  { success: true } | { success: false; error: string }
+> {
+  const me = await requireRole("admin");
+  if (!me.tenantId) {
+    return { success: false, error: "Your account is not attached to a tenant." };
+  }
+  const [cur] = await db
+    .select({ provider: tenants.paymentProvider })
+    .from(tenants)
+    .where(eq(tenants.id, me.tenantId))
+    .limit(1);
+  await db
+    .update(tenants)
+    .set({
+      stripePublishableKey: null,
+      stripeSecretKey: null,
+      ...(cur?.provider === "stripe" ? { paymentProvider: null } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, me.tenantId));
+
+  await recordAudit({
+    action: "payment_gateway.disconnect",
+    targetType: "tenant",
+    targetId: me.tenantId,
+    metadata: { provider: "stripe" },
   });
 
   revalidatePath("/admin/settings");

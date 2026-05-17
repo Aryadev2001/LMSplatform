@@ -136,9 +136,14 @@ export const tenants = pgTable(
     customDomainStatus: customDomainStatusEnum("custom_domain_status")
       .notNull()
       .default("NONE"),
-    // Payments — each tenant uses their own Razorpay (keys encrypted at rest)
+    // Payments — each tenant connects their own gateway (secrets encrypted
+    // at rest). They may use Razorpay or Stripe; paymentProvider marks the
+    // active one ("razorpay" | "stripe" | null).
     razorpayKeyId: varchar("razorpay_key_id", { length: 128 }),
     razorpayKeySecret: text("razorpay_key_secret"),
+    stripePublishableKey: varchar("stripe_publishable_key", { length: 128 }),
+    stripeSecretKey: text("stripe_secret_key"),
+    paymentProvider: varchar("payment_provider", { length: 16 }),
     // Referral config
     referralPointsPercent: doublePrecision("referral_points_percent")
       .notNull()
