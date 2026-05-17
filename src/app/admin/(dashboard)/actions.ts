@@ -2,11 +2,25 @@
 
 import { z } from "zod";
 import { db } from "@/db/client";
-import { programs, students, users } from "@/db/schema";
+import { programs, students, users, tenants } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireRole, isStudentRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
+import { recordAudit } from "@/lib/audit";
+import { syncPlanToGateway } from "@/lib/payments/sync-plan";
+
+/** Auto-mirror a plan into the tenant's gateway, but only if one is
+ *  connected. Never throws — failures are stored on the program for retry. */
+async function autoSyncPlan(tenantId: string, programId: string) {
+  const [t] = await db
+    .select({ provider: tenants.paymentProvider })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!t?.provider) return;
+  await syncPlanToGateway(tenantId, programId);
+}
 
 // ---------- Program CRUD ----------
 const ProgramSchema = z.object({
@@ -39,6 +53,7 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
       tenantId,
     })
     .returning({ id: programs.id });
+  await autoSyncPlan(tenantId, row.id);
   revalidatePath("/admin/programs");
   return { success: true, id: row.id };
 }
@@ -65,8 +80,26 @@ export async function updateProgram(
       updatedAt: new Date(),
     })
     .where(and(eq(programs.id, id), eq(programs.tenantId, tenantId)));
+  await autoSyncPlan(tenantId, id);
   revalidatePath("/admin/programs");
   return { success: true, id };
+}
+
+/** Manual "create/refresh in payment gateway" for one plan (retry button). */
+export async function syncProgramGateway(
+  programId: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  await requireRole("admin");
+  const tenantId = await requireTenantId();
+  const r = await syncPlanToGateway(tenantId, programId);
+  await recordAudit({
+    action: "plan.gateway_sync",
+    targetType: "program",
+    targetId: programId,
+    metadata: { ok: r.ok, ...(r.ok ? {} : { error: r.error }) },
+  });
+  revalidatePath("/admin/programs");
+  return r.ok ? { success: true } : { success: false, error: r.error };
 }
 
 export async function toggleProgramActive(id: string, isActive: boolean) {

@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProgramDialog } from "./program-dialog";
+import { GatewaySyncButton } from "./gateway-sync-button";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export default async function AdminProgramsPage({
               <TableHead className="text-right">Price</TableHead>
               <TableHead className="text-right">Duration</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Gateway</TableHead>
               <TableHead className="text-right">Created</TableHead>
               <TableHead></TableHead>
             </TableRow>
@@ -66,7 +68,7 @@ export default async function AdminProgramsPage({
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                   No programs yet. Create your first one to start accepting enrollments.
                 </TableCell>
               </TableRow>
@@ -94,11 +96,31 @@ export default async function AdminProgramsPage({
                       {p.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {p.gatewaySyncError ? (
+                      <Badge
+                        variant="destructive"
+                        className="font-normal"
+                        title={p.gatewaySyncError}
+                      >
+                        Sync error
+                      </Badge>
+                    ) : p.gatewaySyncedAt && (p.stripePriceId || p.razorpayPlanId) ? (
+                      <Badge variant="default" className="font-normal">
+                        In gateway
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="font-normal">
+                        Not synced
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground">
                     {formatDate(p.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <GatewaySyncButton programId={p.id} />
                       <Link
                         href={`/admin/programs/${p.id}`}
                         className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"

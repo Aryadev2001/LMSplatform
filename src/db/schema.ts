@@ -221,6 +221,12 @@ export const programs = pgTable(
     requiresApplication: boolean("requires_application").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
     stripePriceId: varchar("stripe_price_id", { length: 128 }),
+    // Mirror of this plan inside the tenant's own gateway (created via their
+    // connected Stripe/Razorpay). gatewaySyncError holds the last failure.
+    stripeProductId: varchar("stripe_product_id", { length: 128 }),
+    razorpayPlanId: varchar("razorpay_plan_id", { length: 128 }),
+    gatewaySyncedAt: timestamp("gateway_synced_at", { withTimezone: true }),
+    gatewaySyncError: text("gateway_sync_error"),
     // Phase 7 — multi-tenant / master-course
     tenantId: uuid("tenant_id").references(() => tenants.id, {
       onDelete: "cascade",
