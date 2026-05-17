@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, getCurrentUser, CANONICAL_ADMIN } from "@/lib/auth";
 import { ADMIN_PERMISSIONS, type AdminPermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
+import { encryptSecret, encryptionAvailable } from "@/lib/crypto";
 
 async function requireManageAdmins() {
   const me = await requireRole("admin");
@@ -358,6 +359,92 @@ export async function setTierReward(
     targetType: "tenant",
     targetId: me.tenantId,
     metadata: { tier, courseId },
+  });
+
+  revalidatePath("/admin/settings");
+  return { success: true };
+}
+
+const RazorpaySchema = z.object({
+  keyId: z
+    .string()
+    .trim()
+    .regex(/^rzp_(test|live)_[A-Za-z0-9]+$/, "Key ID looks like rzp_live_xxxxxxxx"),
+  keySecret: z.string().trim().min(10, "Enter your Razorpay key secret").max(256),
+});
+
+/**
+ * A tenant connects THEIR OWN Razorpay so student payments go directly to
+ * them. Tenant scope from the session (never the client). The secret is
+ * encrypted at rest (AES-256-GCM); we never store or echo it in plaintext.
+ * Super-admin only supervises connection status — it can't read the secret.
+ */
+export async function connectRazorpay(
+  input: unknown,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const me = await requireRole("admin");
+  if (!me.tenantId) {
+    return { success: false, error: "Your account is not attached to a tenant." };
+  }
+  if (!encryptionAvailable()) {
+    return {
+      success: false,
+      error:
+        "Secret encryption is not configured on the server — set APP_ENCRYPTION_KEY (or CLERK_SECRET_KEY). Keys were NOT saved.",
+    };
+  }
+  const parsed = RazorpaySchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  let encrypted: string;
+  try {
+    encrypted = encryptSecret(parsed.data.keySecret);
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Could not encrypt the secret.",
+    };
+  }
+
+  await db
+    .update(tenants)
+    .set({
+      razorpayKeyId: parsed.data.keyId,
+      razorpayKeySecret: encrypted,
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, me.tenantId));
+
+  await recordAudit({
+    action: "payment_gateway.connect",
+    targetType: "tenant",
+    targetId: me.tenantId,
+    metadata: { provider: "razorpay", keyId: parsed.data.keyId },
+  });
+
+  revalidatePath("/admin/settings");
+  return { success: true };
+}
+
+export async function disconnectRazorpay(): Promise<
+  { success: true } | { success: false; error: string }
+> {
+  const me = await requireRole("admin");
+  if (!me.tenantId) {
+    return { success: false, error: "Your account is not attached to a tenant." };
+  }
+  await db
+    .update(tenants)
+    .set({ razorpayKeyId: null, razorpayKeySecret: null, updatedAt: new Date() })
+    .where(eq(tenants.id, me.tenantId));
+
+  await recordAudit({
+    action: "payment_gateway.disconnect",
+    targetType: "tenant",
+    targetId: me.tenantId,
+    metadata: { provider: "razorpay" },
   });
 
   revalidatePath("/admin/settings");

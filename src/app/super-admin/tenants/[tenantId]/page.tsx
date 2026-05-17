@@ -82,12 +82,31 @@ export default async function TenantDetailPage({
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Payments</CardTitle>
+              <CardTitle className="text-sm">Payment gateway</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Each tenant connects their own Razorpay. Checkout is still on the shared
-              mock until live Razorpay keys are wired — secret-key storage is deferred
-              until encryption-at-rest is in place (no plaintext secrets).
+            <CardContent className="space-y-2 text-sm">
+              {t.razorpayKeyId && t.razorpayKeySecret ? (
+                <>
+                  <Badge variant="default">Razorpay connected</Badge>
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {t.razorpayKeyId.length > 12
+                      ? `${t.razorpayKeyId.slice(0, 12)}…${t.razorpayKeyId.slice(-4)}`
+                      : t.razorpayKeyId}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Secret is encrypted and not visible here — supervision only.
+                    The tenant manages their own keys.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Badge variant="outline">Not connected</Badge>
+                  <p className="text-[11px] text-muted-foreground">
+                    The tenant hasn&apos;t connected a payment gateway yet. They
+                    do this from their own dashboard → Settings → Payment gateway.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>

@@ -21,6 +21,7 @@ import { AddAdminDialog } from "./add-admin-dialog";
 import { AdminRowActions } from "./admin-row-actions";
 import { TenantBrandingForm } from "./tenant-branding-form";
 import { CustomDomainForm } from "./custom-domain-form";
+import { PaymentGatewayForm } from "./payment-gateway-form";
 import { TierRewardsForm } from "./tier-rewards-form";
 import { ShieldCheck, Lock } from "lucide-react";
 
@@ -93,6 +94,8 @@ export default async function AdminSettingsPage() {
             heroTagline: tenants.heroTagline,
             customDomain: tenants.customDomain,
             customDomainStatus: tenants.customDomainStatus,
+            razorpayKeyId: tenants.razorpayKeyId,
+            razorpayKeySecret: tenants.razorpayKeySecret,
           })
           .from(tenants)
           .where(eq(tenants.id, myTenantId))
@@ -194,6 +197,26 @@ export default async function AdminSettingsPage() {
             <CustomDomainForm
               currentDomain={tenantRow.customDomain}
               status={tenantRow.customDomainStatus}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payment gateway — tenant connects their own Razorpay */}
+      {tenantRow && (
+        <Card className="border-none bg-card shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Payment gateway</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Connect your own Razorpay so student payments land directly in
+              your account. Your secret is encrypted — the platform team can
+              see only whether you&apos;re connected, never your keys.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <PaymentGatewayForm
+              connectedKeyId={tenantRow.razorpayKeyId}
+              hasSecret={!!tenantRow.razorpayKeySecret}
             />
           </CardContent>
         </Card>
