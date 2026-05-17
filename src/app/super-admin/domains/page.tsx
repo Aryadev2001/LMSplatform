@@ -15,6 +15,7 @@ import {
 import { requireSuper, type SuperRole } from "@/lib/auth";
 import { canWrite } from "@/lib/super";
 import { formatDate } from "@/lib/format";
+import { dnsRecordsFor } from "@/lib/dns";
 import { DomainRowActions } from "./domain-row-actions";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +87,20 @@ export default async function SuperDomainsPage() {
             )}
             {rows.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="font-mono text-xs">{r.domain}</TableCell>
+                <TableCell className="font-mono text-xs">
+                  {r.domain}
+                  {(r.status === "PENDING" || r.status === "IN_PROGRESS") && (
+                    <div className="mt-1 space-y-0.5 font-normal text-[10px] text-muted-foreground">
+                      {dnsRecordsFor(r.domain).map((rec, i) => (
+                        <div key={i}>
+                          <span className="font-mono">{rec.type}</span>{" "}
+                          <span className="font-mono">{rec.name}</span> →{" "}
+                          <span className="font-mono">{rec.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="text-sm">
                   {r.tenantName ?? "—"}{" "}
                   <span className="text-xs text-muted-foreground">/{r.tenantSlug}</span>
