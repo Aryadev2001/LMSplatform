@@ -1,5 +1,5 @@
 import { SignIn } from "@clerk/nextjs";
-import { AuthSplit } from "@/components/euro/auth-split";
+import { AnimatedAuth } from "@/components/euro/animated-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function SignInPage() {
   return (
-    <AuthSplit tab="login">
+    <AnimatedAuth tab="login">
       <h2
         className="text-2xl font-extrabold tracking-tight"
         style={{ color: "var(--ed-ink)" }}
@@ -31,6 +31,6 @@ export default function SignInPage() {
           fallbackRedirectUrl="/post-login"
         />
       </div>
-    </AuthSplit>
+    </AnimatedAuth>
   );
 }

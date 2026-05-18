@@ -1,4 +1,4 @@
-import { AuthSplit } from "@/components/euro/auth-split";
+import { AnimatedAuth } from "@/components/euro/animated-auth";
 import { SignUpPanel } from "./sign-up-panel";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +14,8 @@ export default async function SignUpPage({
 }) {
   const { ref } = await searchParams;
   return (
-    <AuthSplit tab="signup">
+    <AnimatedAuth tab="signup">
       <SignUpPanel refCode={ref ?? null} />
-    </AuthSplit>
+    </AnimatedAuth>
   );
 }
