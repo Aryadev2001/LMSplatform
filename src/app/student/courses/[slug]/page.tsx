@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
-import { users, students, lessonProgress } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { users, students, lessonProgress, enrollments } from "@/db/schema";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { requireRole } from "@/lib/auth";
@@ -36,6 +36,13 @@ export default async function StudentCourseDeliveryPage({
     .where(eq(students.userId, me.id))
     .limit(1);
   const enrolled = stu?.assignedProgramId === course.id;
+
+  const [enr] = await db
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .where(and(eq(enrollments.userId, me.id), eq(enrollments.programId, course.id)))
+    .orderBy(desc(enrollments.createdAt))
+    .limit(1);
 
   const allLessonIds = modules.flatMap((m) => m.lessons.map((l) => l.id));
   const done = allLessonIds.length
@@ -100,12 +107,20 @@ export default async function StudentCourseDeliveryPage({
           style={{ background: "linear-gradient(135deg, #8CC63F 0%, #1AADE0 100%)" }}
         >
           <Award className="size-10" />
-          <div>
+          <div className="flex-1">
             <div className="text-lg font-semibold">Certificate of completion</div>
             <div className="text-sm text-white/80">
               You&apos;ve completed {course.name}. Congratulations, {me.fullName ?? "graduate"}!
             </div>
           </div>
+          {enr && (
+            <Link
+              href={`/certificate/${enr.id}`}
+              className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-foreground"
+            >
+              View certificate
+            </Link>
+          )}
         </div>
       )}
 
