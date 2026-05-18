@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { EuroLogo } from "./euro-logo";
+import { CartIndicator } from "./cart-button";
 
 export const EURO_CATEGORIES = [
   { slug: "individuals", label: "Individuals" },
@@ -49,6 +50,7 @@ export function EuroNav() {
         </form>
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
+          <CartIndicator />
           <Link
             href="/partner/onboard"
             className="hidden rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors hover:bg-[var(--ed-bg)] sm:block"

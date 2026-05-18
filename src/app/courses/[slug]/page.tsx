@@ -22,6 +22,7 @@ import { formatCurrency } from "@/lib/format";
 import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { EuroCourseCard } from "@/components/euro/course-card";
+import { AddToCartButton } from "@/components/euro/cart-button";
 
 export const dynamic = "force-dynamic";
 
@@ -223,6 +224,21 @@ export default async function CourseDetailPage({
                     {isApplication ? "Apply now" : "Enroll now"}
                     <ArrowRight className="size-4" />
                   </Link>
+                  {!isApplication && (
+                    <div className="mt-2">
+                      <AddToCartButton
+                        item={{
+                          programId: course.id,
+                          slug: course.slug,
+                          title: course.name,
+                          priceCents: course.priceCents,
+                          currency: course.currency,
+                          instituteSlug: institute.slug,
+                          instituteName: institute.name,
+                        }}
+                      />
+                    </div>
+                  )}
                   <Link
                     href="/sign-in"
                     className="mt-2 flex h-11 w-full items-center justify-center rounded-xl border text-sm font-semibold transition-colors hover:bg-[var(--ed-bg)]"
