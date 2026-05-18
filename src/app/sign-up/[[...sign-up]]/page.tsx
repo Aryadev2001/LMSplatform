@@ -1,20 +1,21 @@
-import { SignUp } from "@clerk/nextjs";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthSplit } from "@/components/euro/auth-split";
+import { SignUpPanel } from "./sign-up-panel";
 
-export default function SignUpPage() {
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Sign up — eurodigital.coach",
+};
+
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ref?: string }>;
+}) {
+  const { ref } = await searchParams;
   return (
-    <AuthShell
-      eyebrow="— Create account"
-      title="Join EDT"
-      description="If you're a paying student, your account is created automatically — check your email."
-    >
-      <SignUp
-        routing="path"
-        path="/sign-up"
-        signInUrl="/sign-in"
-        forceRedirectUrl="/student"
-        fallbackRedirectUrl="/student"
-      />
-    </AuthShell>
+    <AuthSplit tab="signup">
+      <SignUpPanel refCode={ref ?? null} />
+    </AuthSplit>
   );
 }

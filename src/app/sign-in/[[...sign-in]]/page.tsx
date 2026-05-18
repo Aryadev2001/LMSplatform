@@ -1,22 +1,36 @@
 import { SignIn } from "@clerk/nextjs";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthSplit } from "@/components/euro/auth-split";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Login — eurodigital.coach",
+};
 
 export default function SignInPage() {
   return (
-    <AuthShell
-      eyebrow="— Student sign in"
-      title="Welcome back"
-      description="Sign in to your EDT learning dashboard with magic link."
-    >
-      {/* Route by role: /post-login sends each user to their own dashboard,
-          so an admin who lands here is never trapped in the student app. */}
-      <SignIn
-        routing="path"
-        path="/sign-in"
-        signUpUrl="/sign-up"
-        forceRedirectUrl="/post-login"
-        fallbackRedirectUrl="/post-login"
-      />
-    </AuthShell>
+    <AuthSplit tab="login">
+      <h2
+        className="text-2xl font-extrabold tracking-tight"
+        style={{ color: "var(--ed-ink)" }}
+      >
+        Welcome back
+      </h2>
+      <p className="mt-1 text-sm" style={{ color: "var(--ed-mute)" }}>
+        Log in to continue learning. We route you to the right dashboard
+        automatically.
+      </p>
+      {/* /post-login routes by role so an institute admin is never trapped
+          in the learner app. */}
+      <div className="euro-clerk mt-6">
+        <SignIn
+          routing="path"
+          path="/sign-in"
+          signUpUrl="/sign-up"
+          forceRedirectUrl="/post-login"
+          fallbackRedirectUrl="/post-login"
+        />
+      </div>
+    </AuthSplit>
   );
 }
