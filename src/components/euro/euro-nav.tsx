@@ -50,7 +50,7 @@ export function EuroNav() {
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <Link
-            href="/admin/login"
+            href="/partner/onboard"
             className="hidden rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors hover:bg-[var(--ed-bg)] sm:block"
             style={{ color: "var(--ed-ink-2)" }}
           >

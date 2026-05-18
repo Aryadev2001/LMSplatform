@@ -15,7 +15,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "For Institutes",
     links: [
-      { label: "Become a Partner", href: "/admin/login" },
+      { label: "Become a Partner", href: "/partner/onboard" },
       { label: "Partner login", href: "/admin/login" },
       { label: "Pricing & plans", href: "/admin/login" },
       { label: "Sell courses", href: "/admin/login" },
