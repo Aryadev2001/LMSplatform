@@ -96,6 +96,38 @@ export async function getMarketCourses(opts?: {
   return rows;
 }
 
+/** Other published courses from the same institute (for "Recommended next"). */
+export async function getRelatedCourses(
+  tenantId: string,
+  excludeProgramId: string,
+  limit = 3,
+): Promise<MarketCourse[]> {
+  return db
+    .select({
+      id: programs.id,
+      slug: programs.slug,
+      title: programs.name,
+      tagline: programs.tagline,
+      priceCents: programs.priceCents,
+      currency: programs.currency,
+      tier: programs.tier,
+      type: programs.type,
+      instituteName: tenants.name,
+      instituteSlug: tenants.slug,
+    })
+    .from(programs)
+    .innerJoin(tenants, eq(tenants.id, programs.tenantId))
+    .where(
+      and(
+        liveCourseWhere,
+        eq(programs.tenantId, tenantId),
+        ne(programs.id, excludeProgramId),
+      ),
+    )
+    .orderBy(desc(programs.createdAt))
+    .limit(limit);
+}
+
 export async function getFeaturedInstitutes(
   limit = 8,
 ): Promise<MarketInstitute[]> {
