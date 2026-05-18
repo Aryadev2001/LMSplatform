@@ -50,6 +50,31 @@
 }
 
 :root {
+  /* ---- eurodigital.coach brand system (master prompt §1.2, locked hex) ---- */
+  --ed-blue: #00aeef;
+  --ed-blue-dark: #0091c7;
+  --ed-green: #8dc63f;
+  --ed-green-dark: #6fa62a;
+  --ed-ink: #0e1e2b;
+  --ed-ink-2: #243447;
+  --ed-mute: #6b7a8b;
+  --ed-bg: #f5f8fb;
+  --ed-line: #e3e9f0;
+  --ed-warn: #f59e0b;
+  --ed-pink: #ec4899;
+  --ed-indigo: #6366f1;
+  --ed-teal: #14b8a6;
+  --ed-rose: #f43f5e;
+  --ed-gradient: linear-gradient(135deg, #00aeef 0%, #8dc63f 100%);
+  /* signature 135° halftone motif (low-opacity brand asset) */
+  --ed-halftone: repeating-linear-gradient(
+    135deg,
+    rgba(0, 174, 239, 0.16) 0px,
+    rgba(0, 174, 239, 0.16) 2px,
+    transparent 2px,
+    transparent 9px
+  );
+
   /* ---- EDT brand system ---- */
   --brand-green: #8cc63f;
   --brand-blue: #1aade0;
