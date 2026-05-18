@@ -169,6 +169,22 @@ export function formatAiPrice(s: AiService): string {
   return dollars;
 }
 
+/** Partner "operations" price — 30% margin off student retail (§10.5). */
+export function partnerPriceCents(s: AiService): number {
+  return Math.round(s.priceCents * 0.7);
+}
+
+export function formatAiPartnerPrice(s: AiService): string {
+  const dollars = (partnerPriceCents(s) / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+  });
+  if (s.period === "monthly") return `${dollars}/mo`;
+  if (s.period === "yearly") return `${dollars}/yr`;
+  return dollars;
+}
+
 export function formatAiOldPrice(s: AiService): string | null {
   if (!s.oldPriceCents) return null;
   return (s.oldPriceCents / 100).toLocaleString("en-US", {

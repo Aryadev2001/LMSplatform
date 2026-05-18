@@ -29,6 +29,7 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
     { label: "Overview", href: "/admin", icon: LayoutDashboard },
     { label: "Students", href: "/admin/students", icon: GraduationCap },
     { label: "Courses", href: "/admin/programs", icon: BookOpen },
+    { label: "AI Services", href: "/admin/ai-services", icon: Sparkles },
     { label: "Diagnostics", href: "/admin/diagnostics", icon: Activity },
     { label: "Enrollments", href: "/admin/enrollments", icon: ClipboardList },
     { label: "Payments", href: "/admin/payments", icon: CreditCard },
