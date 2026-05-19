@@ -21,8 +21,7 @@ const COVERS = [
 ];
 
 function coverFor(c: MarketCourse): string {
-  const withImage = c as MarketCourse & { imageUrl?: string | null };
-  if (withImage.imageUrl) return withImage.imageUrl;
+  if (c.imageUrl) return c.imageUrl;
   let h = 0;
   for (const ch of c.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   const id = COVERS[h % COVERS.length];

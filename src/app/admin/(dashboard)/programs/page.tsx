@@ -137,6 +137,7 @@ export default async function AdminProgramsPage({
                           currency: p.currency,
                           durationMonths: p.durationMonths,
                           isActive: p.isActive,
+                          imageUrl: p.imageUrl,
                         }}
                       />
                     </div>

@@ -262,6 +262,7 @@ export const programs = pgTable(
     tier: courseTierEnum("tier").notNull().default("low"),
     type: courseTypeEnum("type").notNull().default("one_time"),
     badgeColor: varchar("badge_color", { length: 32 }),
+    imageUrl: text("image_url"),
     status: courseStatusEnum("status").notNull().default("draft"),
     requiresApplication: boolean("requires_application").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),

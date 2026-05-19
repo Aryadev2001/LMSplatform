@@ -30,6 +30,7 @@ const ProgramSchema = z.object({
   currency: z.string().length(3).default("USD"),
   durationMonths: z.number().int().min(1).max(60),
   isActive: z.boolean().default(true),
+  imageUrl: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
 export type ProgramResult = { success: true; id: string } | { success: false; error: string };
@@ -50,6 +51,7 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
       currency: parsed.data.currency,
       durationMonths: parsed.data.durationMonths,
       isActive: parsed.data.isActive,
+      imageUrl: parsed.data.imageUrl || null,
       tenantId,
     })
     .returning({ id: programs.id });
@@ -77,6 +79,7 @@ export async function updateProgram(
       currency: parsed.data.currency,
       durationMonths: parsed.data.durationMonths,
       isActive: parsed.data.isActive,
+      imageUrl: parsed.data.imageUrl || null,
       updatedAt: new Date(),
     })
     .where(and(eq(programs.id, id), eq(programs.tenantId, tenantId)));

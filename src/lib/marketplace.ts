@@ -17,6 +17,7 @@ export interface MarketCourse {
   currency: string;
   tier: "low" | "mid" | "high";
   type: "one_time" | "subscription";
+  imageUrl: string | null;
   instituteName: string;
   instituteSlug: string;
 }
@@ -85,6 +86,7 @@ export async function getMarketCourses(opts?: {
       currency: programs.currency,
       tier: programs.tier,
       type: programs.type,
+      imageUrl: programs.imageUrl,
       instituteName: tenants.name,
       instituteSlug: tenants.slug,
     })
@@ -112,6 +114,7 @@ export async function getRelatedCourses(
       currency: programs.currency,
       tier: programs.tier,
       type: programs.type,
+      imageUrl: programs.imageUrl,
       instituteName: tenants.name,
       instituteSlug: tenants.slug,
     })

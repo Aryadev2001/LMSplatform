@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { FileUpload } from "@/components/file-upload";
 import { createProgram, updateProgram } from "../actions";
 
 const Schema = z.object({
@@ -29,6 +30,7 @@ const Schema = z.object({
   currency: z.string().length(3),
   durationMonths: z.coerce.number().int().min(1).max(60),
   isActive: z.boolean(),
+  imageUrl: z.string().optional().or(z.literal("")),
 });
 
 type Values = z.input<typeof Schema>;
@@ -43,6 +45,7 @@ interface ProgramDialogProps {
     currency: string;
     durationMonths: number;
     isActive: boolean;
+    imageUrl?: string | null;
   };
 }
 
@@ -58,9 +61,11 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
       currency: initial?.currency ?? "USD",
       durationMonths: initial?.durationMonths ?? 3,
       isActive: initial?.isActive ?? true,
+      imageUrl: initial?.imageUrl ?? "",
     },
   });
   const isActive = watch("isActive");
+  const imageUrl = watch("imageUrl");
 
   function onSubmit(values: Values) {
     const priceNum = Number(values.priceDollars);
@@ -73,6 +78,7 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
         currency: values.currency,
         durationMonths: durationNum,
         isActive: !!values.isActive,
+        imageUrl: values.imageUrl ?? "",
       };
       const r = mode === "edit" && initial
         ? await updateProgram(initial.id, payload)
@@ -111,6 +117,15 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
           </Field>
           <Field label="Description" optional>
             <Textarea {...register("description")} rows={3} placeholder="Bi-weekly 1-on-1s, assignments..." className="rounded-xl border-black/10" />
+          </Field>
+          <Field label="Cover image" optional>
+            <FileUpload
+              accept="image/*"
+              label="Upload a cover image"
+              value={imageUrl || null}
+              onUploaded={(url) => setValue("imageUrl", url)}
+              onClear={() => setValue("imageUrl", "")}
+            />
           </Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Price" error={errors.priceDollars?.message}>
