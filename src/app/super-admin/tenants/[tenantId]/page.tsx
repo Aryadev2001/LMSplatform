@@ -129,16 +129,6 @@ export default async function TenantDetailPage({
               })()}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Custom domain</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              {t.customDomain
-                ? `${t.customDomain} — ${t.customDomainStatus}`
-                : "None. Managed via the manual DNS queue (P7-5)."}
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

@@ -20,7 +20,6 @@ import { initialsOf, formatDate } from "@/lib/format";
 import { AddAdminDialog } from "./add-admin-dialog";
 import { AdminRowActions } from "./admin-row-actions";
 import { TenantBrandingForm } from "./tenant-branding-form";
-import { CustomDomainForm } from "./custom-domain-form";
 import { PaymentGatewayForm } from "./payment-gateway-form";
 import { TierRewardsForm } from "./tier-rewards-form";
 import { ShieldCheck, Lock } from "lucide-react";
@@ -92,8 +91,6 @@ export default async function AdminSettingsPage() {
             brandPrimaryColor: tenants.brandPrimaryColor,
             brandSecondaryColor: tenants.brandSecondaryColor,
             heroTagline: tenants.heroTagline,
-            customDomain: tenants.customDomain,
-            customDomainStatus: tenants.customDomainStatus,
             razorpayKeyId: tenants.razorpayKeyId,
             razorpayKeySecret: tenants.razorpayKeySecret,
             stripePublishableKey: tenants.stripePublishableKey,
@@ -183,25 +180,6 @@ export default async function AdminSettingsPage() {
                 brandSecondaryColor: tenantRow.brandSecondaryColor,
                 heroTagline: tenantRow.heroTagline ?? "",
               }}
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Custom domain */}
-      {tenantRow && (
-        <Card className="border-none bg-card shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Custom domain</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Run your portal on your own domain. Requests are reviewed and the
-              DNS is configured manually — it goes live once approved.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <CustomDomainForm
-              currentDomain={tenantRow.customDomain}
-              status={tenantRow.customDomainStatus}
             />
           </CardContent>
         </Card>

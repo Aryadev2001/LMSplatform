@@ -15,7 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
+  createMasterCourse,
   promoteCourseToMaster,
   pushMasterCourse,
   syncMasterCourse,
@@ -56,6 +59,14 @@ export function MasterCourseManager({
   const [pending, startTransition] = useTransition();
   const [promoteId, setPromoteId] = useState<string>("");
   const [targets, setTargets] = useState<Record<string, Set<string>>>({});
+  const [form, setForm] = useState({
+    name: "",
+    tagline: "",
+    priceRupees: "",
+    durationMonths: "3",
+    tier: "low" as "low" | "mid" | "high",
+    type: "one_time" as "one_time" | "subscription",
+  });
 
   function run(fn: () => Promise<{ success: boolean; error?: string }>, okMsg: string) {
     startTransition(async () => {
@@ -83,6 +94,145 @@ export function MasterCourseManager({
 
   return (
     <div className="space-y-6">
+      {/* Create a new master course (e.g. AI) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Create a master course</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Name</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. AI for Everyone"
+                disabled={!writable}
+                className="h-10 rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Tagline (optional)</Label>
+              <Input
+                value={form.tagline}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, tagline: e.target.value }))
+                }
+                placeholder="One-line summary"
+                disabled={!writable}
+                className="h-10 rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Price (₹)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.priceRupees}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, priceRupees: e.target.value }))
+                }
+                placeholder="0 for free"
+                disabled={!writable}
+                className="h-10 rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Duration (months)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={form.durationMonths}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, durationMonths: e.target.value }))
+                }
+                disabled={!writable}
+                className="h-10 rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Tier</Label>
+              <Select
+                value={form.tier}
+                onValueChange={(v) =>
+                  v && setForm((f) => ({ ...f, tier: v as typeof f.tier }))
+                }
+                disabled={!writable}
+              >
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Beginner</SelectItem>
+                  <SelectItem value="mid">Intermediate</SelectItem>
+                  <SelectItem value="high">Advanced</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Type</Label>
+              <Select
+                value={form.type}
+                onValueChange={(v) =>
+                  v && setForm((f) => ({ ...f, type: v as typeof f.type }))
+                }
+                disabled={!writable}
+              >
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="one_time">One-time</SelectItem>
+                  <SelectItem value="subscription">Subscription</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              disabled={
+                !writable || pending || form.name.trim().length < 3
+              }
+              onClick={() =>
+                run(async () => {
+                  const r = await createMasterCourse({
+                    name: form.name,
+                    tagline: form.tagline,
+                    priceRupees: form.priceRupees || 0,
+                    durationMonths: form.durationMonths || 3,
+                    tier: form.tier,
+                    type: form.type,
+                  });
+                  if (r.success)
+                    setForm({
+                      name: "",
+                      tagline: "",
+                      priceRupees: "",
+                      durationMonths: "3",
+                      tier: "low",
+                      type: "one_time",
+                    });
+                  return r;
+                }, "Master course created — push it to tenants below")
+              }
+              className="rounded-xl"
+            >
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Sparkles className="size-4" />
+              )}
+              Create master course
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Created as a draft master. Push it to tenants below; each tenant
+            sets their price and publishes it to go live for students (who
+            can pay or redeem reward points at checkout).
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Promote */}
       <Card>
         <CardHeader>

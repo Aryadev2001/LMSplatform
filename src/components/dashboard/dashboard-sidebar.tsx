@@ -38,19 +38,19 @@ export function DashboardSidebar({ role, brand }: DashboardSidebarProps) {
   return (
     <Sidebar collapsible="icon" className="border-r border-black/5">
       <SidebarHeader>
-        <div className="flex items-center gap-2.5 px-2 py-3">
+        <div className="flex items-center gap-3 px-2 py-4">
           {brand?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={brand.logoUrl}
               alt={brandName}
-              className="size-8 shrink-0 rounded-md object-contain"
+              className="size-12 shrink-0 rounded-lg object-contain"
             />
           ) : (
-            <BrandMark className="size-8 shrink-0 text-foreground" />
+            <BrandMark className="size-12 shrink-0 text-foreground" />
           )}
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-sm font-semibold tracking-tight">{brandName}</span>
+            <span className="truncate text-base font-bold tracking-tight">{brandName}</span>
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
               {roleLabel}
             </span>

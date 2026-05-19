@@ -37,7 +37,6 @@ export default async function SuperTenantsPage() {
       slug: tenants.slug,
       name: tenants.name,
       status: tenants.status,
-      customDomain: tenants.customDomain,
       createdAt: tenants.createdAt,
       userCount: sql<number>`(select count(*)::int from ${users} u where u.tenant_id = ${tenants.id})`,
     })
@@ -61,14 +60,13 @@ export default async function SuperTenantsPage() {
               <TableHead>Subdomain</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Users</TableHead>
-              <TableHead>Custom domain</TableHead>
               <TableHead>Created</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                   No tenants yet.
                 </TableCell>
               </TableRow>
@@ -90,9 +88,6 @@ export default async function SuperTenantsPage() {
                   <Badge variant={STATUS_VARIANT[t.status] ?? "outline"}>{t.status}</Badge>
                 </TableCell>
                 <TableCell>{t.userCount}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {t.customDomain ?? "—"}
-                </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {formatDate(t.createdAt)}
                 </TableCell>

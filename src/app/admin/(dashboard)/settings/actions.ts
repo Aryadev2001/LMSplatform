@@ -3,9 +3,9 @@
 import { z } from "zod";
 import { clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/db/client";
-import { users, tenants, domainRequests, tierRewards, programs } from "@/db/schema";
-import { eq, and, ne } from "drizzle-orm";
-import { getRootDomain, requireTenantId } from "@/lib/tenant";
+import { users, tenants, tierRewards, programs } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
+import { requireTenantId } from "@/lib/tenant";
 import { revalidatePath } from "next/cache";
 import { requireRole, getCurrentUser, CANONICAL_ADMIN } from "@/lib/auth";
 import { ADMIN_PERMISSIONS, type AdminPermission } from "@/lib/permissions";
@@ -232,78 +232,6 @@ export async function updateMyTenantBranding(
 
   revalidatePath("/admin/settings");
   revalidatePath("/", "layout");
-  return { success: true };
-}
-
-const FQDN =
-  /^(?=.{4,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
-
-const DomainRequestSchema = z.object({
-  domain: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .max(253)
-    .regex(FQDN, "Enter a valid domain like learn.yourbrand.com"),
-});
-
-/**
- * Tenant-admin requests a custom domain for THEIR OWN tenant (tenant derived
- * from the session, never the client). Queues a domain_requests row + flips
- * the tenant to REQUESTED. Resolution stays off until a super-admin manually
- * adds it in Vercel and marks it configured (P7-5 manual DNS workflow).
- */
-export async function requestCustomDomain(
-  input: unknown,
-): Promise<{ success: true } | { success: false; error: string }> {
-  const me = await requireRole("admin");
-  if (!me.tenantId) {
-    return { success: false, error: "Your account is not attached to a tenant." };
-  }
-  const parsed = DomainRequestSchema.safeParse(input);
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-  const domain = parsed.data.domain;
-
-  // Must be an external domain, not the platform root or a subdomain of it.
-  const root = getRootDomain();
-  if (root && (domain === root || domain.endsWith(`.${root}`))) {
-    return {
-      success: false,
-      error: `Use your subdomain on ${root} instead — custom domains are for your own external domain.`,
-    };
-  }
-
-  // Domain must be globally unique across tenants.
-  const taken = await db
-    .select({ id: tenants.id })
-    .from(tenants)
-    .where(and(eq(tenants.customDomain, domain), ne(tenants.id, me.tenantId)))
-    .limit(1);
-  if (taken.length > 0) {
-    return { success: false, error: "That domain is already claimed by another tenant." };
-  }
-
-  await db.insert(domainRequests).values({
-    tenantId: me.tenantId,
-    domain,
-    status: "PENDING",
-  });
-
-  await db
-    .update(tenants)
-    .set({ customDomain: domain, customDomainStatus: "REQUESTED", updatedAt: new Date() })
-    .where(eq(tenants.id, me.tenantId));
-
-  await recordAudit({
-    action: "domain.request",
-    targetType: "tenant",
-    targetId: me.tenantId,
-    metadata: { domain },
-  });
-
-  revalidatePath("/admin/settings");
   return { success: true };
 }
 

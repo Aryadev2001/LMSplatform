@@ -47,6 +47,48 @@ async function cloneStructure(masterId: string, copyId: string) {
   }
 }
 
+/**
+ * Author a brand-new master course (EDT catalog, tenantId NULL) — lets
+ * super-admin add additional courses (AI or any) to push to tenants
+ * without a tenant having authored it first.
+ */
+export async function createMasterCourse(data: {
+  name: string;
+  tagline?: string | null;
+  description?: string | null;
+  priceCents: number;
+  durationMonths?: number;
+  tier?: "low" | "mid" | "high";
+  type?: "one_time" | "subscription";
+}): Promise<string> {
+  const base = data.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 90);
+  const slug = `${base || "course"}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const [master] = await db
+    .insert(programs)
+    .values({
+      slug,
+      name: data.name,
+      tagline: data.tagline ?? null,
+      description: data.description ?? null,
+      priceCents: data.priceCents,
+      currency: "INR",
+      durationMonths: data.durationMonths ?? 3,
+      tier: data.tier ?? "low",
+      type: data.type ?? "one_time",
+      status: "draft",
+      isActive: true,
+      tenantId: null,
+      isMasterCourse: true,
+    })
+    .returning({ id: programs.id });
+  return master.id;
+}
+
 /** Deep-clone an existing course into a NEW master (tenantId NULL). */
 export async function promoteToMaster(sourceCourseId: string): Promise<string> {
   const [src] = await db
