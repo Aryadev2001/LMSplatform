@@ -9,14 +9,19 @@ import { impersonateTenant } from "../../actions";
 export function OpenAsTenantButton({
   tenantId,
   disabled,
+  label = "Open dashboard as this tenant",
+  size = "default",
 }: {
   tenantId: string;
   disabled?: boolean;
+  label?: string;
+  size?: "default" | "sm";
 }) {
   const [pending, start] = useTransition();
   return (
     <Button
       variant="outline"
+      size={size}
       className="rounded-xl"
       disabled={disabled || pending}
       onClick={() =>
@@ -32,7 +37,7 @@ export function OpenAsTenantButton({
       ) : (
         <LogIn className="size-4" />
       )}
-      Open dashboard as this tenant
+      {label}
     </Button>
   );
 }

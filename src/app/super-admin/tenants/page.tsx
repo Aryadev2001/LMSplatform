@@ -17,6 +17,7 @@ import { requireSuper, type SuperRole } from "@/lib/auth";
 import { canWrite } from "@/lib/super";
 import { formatDate } from "@/lib/format";
 import { CreateTenantDialog } from "./create-tenant-dialog";
+import { OpenAsTenantButton } from "./[tenantId]/open-as-tenant-button";
 
 export const dynamic = "force-dynamic";
 
@@ -61,12 +62,13 @@ export default async function SuperTenantsPage() {
               <TableHead>Status</TableHead>
               <TableHead>Users</TableHead>
               <TableHead>Created</TableHead>
+              <TableHead className="text-right">Access</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                   No tenants yet.
                 </TableCell>
               </TableRow>
@@ -90,6 +92,14 @@ export default async function SuperTenantsPage() {
                 <TableCell>{t.userCount}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {formatDate(t.createdAt)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <OpenAsTenantButton
+                    tenantId={t.id}
+                    disabled={!writable}
+                    label="Open"
+                    size="sm"
+                  />
                 </TableCell>
               </TableRow>
             ))}
