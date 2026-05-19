@@ -47,9 +47,7 @@ export function EuroFooter() {
       <div className="mx-auto max-w-7xl px-6 py-14">
         <div className="grid gap-10 md:grid-cols-5">
           <div className="md:col-span-1">
-            <div className="rounded-lg bg-white px-3 py-2">
-              <EuroLogo />
-            </div>
+            <EuroLogo onDark />
             <p
               className="mt-4 text-xs leading-relaxed"
               style={{ color: "var(--ed-mute)" }}
