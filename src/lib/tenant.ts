@@ -31,7 +31,28 @@ export const RESERVED_SUBDOMAINS = new Set([
   "edt",
   "mail",
   "support",
+  // Portal subdomains — never a tenant storefront slug.
+  "partner",
+  "student",
 ]);
+
+/**
+ * Which product portal a host points at. `partner.<root>` → the tenant
+ * dashboard, `student.<root>` → the student dashboard, anything else
+ * (apex / institute subdomain / local) → null (the public LMS).
+ * Pure string parse — safe for middleware.
+ */
+export function portalForHost(
+  hostHeader: string | null | undefined,
+): "partner" | "student" | null {
+  if (!hostHeader) return null;
+  const host = hostHeader.toLowerCase().split(":")[0].trim();
+  const root = getRootDomain();
+  if (!root) return null;
+  if (host === `partner.${root}`) return "partner";
+  if (host === `student.${root}`) return "student";
+  return null;
+}
 
 /** The original/primary tenant — existing EDT data lives here (zero-regression). */
 export const DEFAULT_TENANT_SLUG = process.env.DEFAULT_TENANT_SLUG ?? "edt";

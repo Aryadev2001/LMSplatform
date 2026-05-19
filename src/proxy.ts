@@ -2,6 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import {
   parseTenantHost,
+  portalForHost,
   TENANT_SLUG_HEADER,
   TENANT_DOMAIN_HEADER,
 } from "@/lib/tenant";
@@ -54,6 +55,17 @@ export default clerkMiddleware(async (auth, req) => {
     requestHeaders.set(TENANT_DOMAIN_HEADER, domain);
     return NextResponse.next({ request: { headers: requestHeaders } });
   };
+
+  // Portal subdomains: partner.<root> serves the tenant dashboard, and
+  // student.<root> serves the student dashboard. Only the bare root is
+  // redirected to the section entry — deeper paths flow normally so the
+  // whole dashboard lives under that domain (auth handled as usual).
+  const portal = portalForHost(req.headers.get("host"));
+  if (portal && req.nextUrl.pathname === "/") {
+    return NextResponse.redirect(
+      new URL(portal === "partner" ? "/admin" : "/student", req.url),
+    );
+  }
 
   if (isPublicRoute(req)) return pass();
 
