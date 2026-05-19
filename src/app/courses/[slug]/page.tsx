@@ -23,6 +23,7 @@ import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { EuroCourseCard } from "@/components/euro/course-card";
 import { AddToCartButton } from "@/components/euro/cart-button";
+import { WishlistButton } from "@/components/euro/wishlist-button";
 
 export const dynamic = "force-dynamic";
 
@@ -237,6 +238,19 @@ export default async function CourseDetailPage({
                           instituteName: institute.name,
                         }}
                       />
+                      <div className="mt-2">
+                        <WishlistButton
+                          item={{
+                            programId: course.id,
+                            slug: course.slug,
+                            title: course.name,
+                            priceCents: course.priceCents,
+                            currency: course.currency,
+                            instituteSlug: institute.slug,
+                            instituteName: institute.name,
+                          }}
+                        />
+                      </div>
                     </div>
                   )}
                   <Link

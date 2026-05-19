@@ -1,114 +1,107 @@
 import Link from "next/link";
-import { db } from "@/db/client";
-import { users, students, programs, modules, lessons, lessonProgress } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/dashboard/empty-state";
-import { requireRole } from "@/lib/auth";
 import { BookOpen, ArrowRight } from "lucide-react";
+import { requireRole } from "@/lib/auth";
+import { getStudentSnapshot } from "@/lib/student";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentCoursesPage() {
   const auth = await requireRole("student");
-  const [me] = await db.select().from(users).where(eq(users.clerkId, auth.userId)).limit(1);
-  if (!me) return null;
+  const snap = await getStudentSnapshot(auth.userId);
+  if (!snap) return null;
 
-  const [stu] = await db
-    .select()
-    .from(students)
-    .where(eq(students.userId, me.id))
-    .limit(1);
-
-  const course = stu?.assignedProgramId
-    ? (await db.select().from(programs).where(eq(programs.id, stu.assignedProgramId)).limit(1))[0]
-    : null;
-
-  let percent = 0;
-  if (course) {
-    const mods = await db.select({ id: modules.id }).from(modules).where(eq(modules.courseId, course.id));
-    const modIds = mods.map((m) => m.id);
-    const courseLessons = modIds.length
-      ? await db.select({ id: lessons.id }).from(lessons).where(inArray(lessons.moduleId, modIds))
-      : [];
-    const lessonIds = courseLessons.map((l) => l.id);
-    const done = lessonIds.length
-      ? await db
-          .select({ id: lessonProgress.id })
-          .from(lessonProgress)
-          .where(
-            and(
-              eq(lessonProgress.userId, me.id),
-              inArray(lessonProgress.lessonId, lessonIds),
-              eq(lessonProgress.percentComplete, 100),
-            ),
-          )
-      : [];
-    percent =
-      lessonIds.length === 0 ? 0 : Math.round((done.length / lessonIds.length) * 100);
-  }
+  const active = snap.courses.filter((c) => !c.completed);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      <PageHeader
-        eyebrow="— My courses"
-        title="Your learning"
-        description="Continue where you left off."
-      />
-
-      {!course ? (
-        <Card className="border-none bg-card shadow-card">
-          <CardContent className="py-4">
-            <EmptyState
-              icon={BookOpen}
-              title="No course yet"
-              description="Take the Business X-Ray to get matched, or enrol in a program."
-              action={
-                <Link
-                  href="/diagnostic"
-                  className={buttonVariants({ size: "sm", className: "rounded-xl" })}
-                >
-                  Take the Business X-Ray
-                </Link>
-              }
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <Link
-          href={`/student/courses/${course.slug}`}
-          className="block overflow-hidden rounded-2xl bg-card shadow-card transition-shadow hover:shadow-soft"
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div>
+        <h1
+          className="font-display text-2xl font-extrabold tracking-tight"
+          style={{ color: "var(--ed-ink)" }}
         >
-          <div className="bg-brand-gradient p-6 text-white">
-            <div className="text-[10px] uppercase tracking-widest text-white/70">
-              Enrolled program
-            </div>
-            <div className="mt-1 text-2xl font-semibold tracking-tight">{course.name}</div>
-            <div className="text-sm text-white/80">{course.tagline}</div>
-          </div>
-          <div className="p-6">
-            <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="font-medium">Progress</span>
-              <span className="tabular-nums text-muted-foreground">{percent}%</span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+          My courses
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--ed-mute)" }}>
+          {snap.courses.length} enrolled · {active.length} in progress
+        </p>
+      </div>
+
+      {snap.courses.length === 0 ? (
+        <div
+          className="flex flex-col items-center gap-3 rounded-2xl border border-dashed py-16 text-center"
+          style={{ borderColor: "var(--ed-line)", color: "var(--ed-mute)" }}
+        >
+          <BookOpen className="size-9" />
+          <p className="text-sm">You haven&apos;t enrolled in any courses yet.</p>
+          <Link
+            href="/explore"
+            className="rounded-xl px-5 py-2.5 text-sm font-bold text-white"
+            style={{ background: "var(--ed-gradient)" }}
+          >
+            Explore courses
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {snap.courses.map((co) => (
+            <Link
+              key={co.enrollmentId}
+              href={co.slug ? `/student/courses/${co.slug}` : "#"}
+              className="flex flex-col rounded-2xl border bg-white p-5 transition-shadow hover:shadow-md"
+              style={{ borderColor: "var(--ed-line)" }}
+            >
               <div
-                className="h-full rounded-full bg-brand-gradient"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-            <div className="mt-5 flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                {percent === 100 ? "Completed 🎉" : "Continue learning"}
-              </span>
-              <span className="inline-flex items-center gap-1 text-sm font-medium">
-                Open course <ArrowRight className="size-4" />
-              </span>
-            </div>
-          </div>
-        </Link>
+                className="text-base font-bold leading-snug"
+                style={{ color: "var(--ed-ink)" }}
+              >
+                {co.name}
+              </div>
+              {co.tagline && (
+                <p
+                  className="mt-1 line-clamp-2 text-xs"
+                  style={{ color: "var(--ed-mute)" }}
+                >
+                  {co.tagline}
+                </p>
+              )}
+              <div className="mt-auto pt-4">
+                <div
+                  className="h-2 w-full overflow-hidden rounded-full"
+                  style={{ background: "var(--ed-bg)" }}
+                >
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${co.percent}%`,
+                      background: "var(--ed-gradient)",
+                    }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span
+                    className="text-[12px] font-semibold"
+                    style={{
+                      color: co.completed
+                        ? "var(--ed-green-dark)"
+                        : "var(--ed-mute)",
+                    }}
+                  >
+                    {co.completed
+                      ? "Completed 🎉"
+                      : `${co.percent}% · ${co.doneLessons}/${co.totalLessons} lessons`}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 text-[12px] font-bold"
+                    style={{ color: "var(--ed-blue)" }}
+                  >
+                    {co.completed ? "Review" : "Continue"}{" "}
+                    <ArrowRight className="size-3.5" />
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
     </div>
   );
