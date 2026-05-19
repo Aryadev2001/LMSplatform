@@ -14,6 +14,7 @@ import {
   fetchGatewayPaymentStatus,
 } from "@/lib/payments/gateway";
 import { processOrderPayment } from "@/lib/payments/webhook";
+import { createInvoiceForOrder } from "@/lib/payments/invoice";
 import { awardReferralForPurchase } from "@/lib/referral";
 
 /**
@@ -158,6 +159,14 @@ async function repairPaidOrder(orderId: string): Promise<number> {
       /* referral is non-critical to access — never block the grant */
     }
     done++;
+  }
+
+  // Original fulfilment may have crashed before issuing the receipt.
+  // Idempotent — no-op if it already exists.
+  try {
+    await createInvoiceForOrder(orderId);
+  } catch {
+    /* non-critical */
   }
   return done;
 }

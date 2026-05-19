@@ -147,6 +147,7 @@ export const refundStatusEnum = pgEnum("refund_status", [
   "succeeded",
   "failed",
 ]);
+export const invoiceStatusEnum = pgEnum("invoice_status", ["issued", "void"]);
 
 // ---------- Phase 7: Tenant ----------
 export const tenants = pgTable(
@@ -1051,4 +1052,43 @@ export const refunds = pgTable(
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
   (t) => [index("refunds_order_idx").on(t.orderId)],
+);
+
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    invoiceNumber: varchar("invoice_number", { length: 40 }).notNull(),
+    // null = mixed-institute order (seller_name carries the snapshot label)
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "set null",
+    }),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    status: invoiceStatusEnum("status").notNull().default("issued"),
+    sellerName: varchar("seller_name", { length: 200 }).notNull(),
+    billingName: varchar("billing_name", { length: 160 }),
+    billingEmail: varchar("billing_email", { length: 200 }),
+    billingCountry: varchar("billing_country", { length: 2 }),
+    taxId: varchar("tax_id", { length: 60 }),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    subtotalCents: integer("subtotal_cents").notNull(),
+    discountCents: integer("discount_cents").notNull().default(0),
+    pointsRedeemedCents: integer("points_redeemed_cents").notNull().default(0),
+    taxCents: integer("tax_cents").notNull().default(0),
+    taxRateBps: integer("tax_rate_bps").notNull().default(0),
+    taxLabel: varchar("tax_label", { length: 40 }),
+    totalCents: integer("total_cents").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("invoices_order_idx").on(t.orderId),
+    uniqueIndex("invoices_number_idx").on(t.invoiceNumber),
+    index("invoices_tenant_idx").on(t.tenantId),
+    index("invoices_user_idx").on(t.userId),
+  ],
 );

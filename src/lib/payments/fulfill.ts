@@ -13,6 +13,7 @@ import {
   redeemPointsAtCheckout,
   awardReferralForPurchase,
 } from "@/lib/referral";
+import { createInvoiceForOrder } from "@/lib/payments/invoice";
 
 /**
  * Grant access for a paid order. THE single fulfilment path — the mock and
@@ -219,6 +220,15 @@ export async function fulfillOrderById(
     .update(carts)
     .set({ status: "converted", updatedAt: new Date() })
     .where(and(eq(carts.userId, dbUser.id), eq(carts.status, "open")));
+
+  // Receipt — best-effort: a paid order with access granted must never be
+  // blocked by an invoice write. Idempotent, so reconcile re-issues if this
+  // ever misses.
+  try {
+    await createInvoiceForOrder(order.id);
+  } catch {
+    /* non-critical to access; reconcile/replay will re-attempt */
+  }
 
   return {
     ok: true,

@@ -82,16 +82,16 @@ export function CheckoutFlow({ pointsBalance }: { pointsBalance: number }) {
     redeemPoints: usePts > 0 && singleInstitute,
   };
 
-  function goSuccess(orderRef: string, n: number) {
+  function goSuccess(orderRef: string, n: number, orderId: string) {
     clear();
     router.push(
-      `/checkout/success?ref=${encodeURIComponent(orderRef)}&items=${n}`,
+      `/checkout/success?ref=${encodeURIComponent(orderRef)}&items=${n}&order=${orderId}`,
     );
   }
 
   async function runMock() {
     const r = await placeOrder(payload);
-    if (r.success) goSuccess(r.orderRef, r.items);
+    if (r.success) goSuccess(r.orderRef, r.items, r.orderId);
     else toast.error(r.error);
   }
 
@@ -136,7 +136,7 @@ export function CheckoutFlow({ pointsBalance }: { pointsBalance: number }) {
               razorpayPaymentId: resp.razorpay_payment_id,
               razorpaySignature: resp.razorpay_signature,
             });
-            if (c.success) goSuccess(c.orderRef, c.items);
+            if (c.success) goSuccess(c.orderRef, c.items, c.orderId);
             else toast.error(c.error);
           });
         },

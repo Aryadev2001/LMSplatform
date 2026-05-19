@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, ArrowRight, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle2, ArrowRight, Sparkles, XCircle, FileText } from "lucide-react";
 import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { confirmCheckout } from "../actions";
@@ -104,11 +104,6 @@ export default async function CheckoutSuccessPage({
               Order {ref}
             </p>
           )}
-          <p className="mt-3 text-[11px]" style={{ color: "var(--ed-mute)" }}>
-            Test mode — no real charge. A real receipt/invoice is issued once
-            live payment processing is wired.
-          </p>
-
           <div className="mt-6 flex flex-col gap-2">
             <Link
               href="/student/courses"
@@ -117,6 +112,15 @@ export default async function CheckoutSuccessPage({
             >
               Start learning <ArrowRight className="size-4" />
             </Link>
+            {sp.order && (
+              <Link
+                href={`/invoice/${sp.order}`}
+                className="flex items-center justify-center gap-2 rounded-xl border px-6 py-3 text-sm font-semibold"
+                style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink-2)" }}
+              >
+                <FileText className="size-4" /> View / download receipt
+              </Link>
+            )}
             <Link
               href="/student/ai-services"
               className="flex items-center justify-center gap-2 rounded-xl border px-6 py-3 text-sm font-semibold"
