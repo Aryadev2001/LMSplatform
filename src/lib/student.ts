@@ -1,7 +1,8 @@
-import { and, eq, inArray, gte, sql } from "drizzle-orm";
+import { and, eq, inArray, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   users,
+  tenants,
   enrollments,
   programs,
   modules,
@@ -41,10 +42,51 @@ export interface StudentSnapshot {
   };
 }
 
-/** Stable, non-secret display id derived from the user uuid. */
-function studentCode(userId: string, year: number): string {
-  const digits = userId.replace(/\D/g, "").slice(0, 5).padStart(5, "0");
-  return `EDS-${year}-${digits}`;
+/**
+ * The persisted, unique, tenant-scoped student id. Lazily assigned on
+ * first read if missing (idempotent under the unique index + concurrent
+ * calls) so every student that touches the dashboard has a stable record
+ * key. Format: "<tenantslug>-<6 base36>".
+ */
+export async function ensureStudentCode(
+  userId: string,
+  tenantId: string | null,
+): Promise<string> {
+  let slug = "eds";
+  if (tenantId) {
+    const [t] = await db
+      .select({ slug: tenants.slug })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    const cleaned = t?.slug
+      ?.toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 12);
+    if (cleaned) slug = cleaned;
+  }
+
+  for (let i = 0; i < 6; i++) {
+    const code = `${slug}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const [row] = await db
+        .update(users)
+        .set({ studentCode: code })
+        .where(and(eq(users.id, userId), isNull(users.studentCode)))
+        .returning({ code: users.studentCode });
+      if (row?.code) return row.code;
+      // No row updated → a code already exists for this user; return it.
+      const [u] = await db
+        .select({ code: users.studentCode })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      if (u?.code) return u.code;
+    } catch {
+      // Unique collision on the generated code — retry with a new one.
+    }
+  }
+  return `${slug}-${userId.slice(0, 6)}`;
 }
 
 /**
@@ -62,6 +104,8 @@ export async function getStudentSnapshot(
       email: users.email,
       pointsBalance: users.pointsBalance,
       createdAt: users.createdAt,
+      tenantId: users.tenantId,
+      studentCode: users.studentCode,
     })
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
@@ -180,13 +224,15 @@ export async function getStudentSnapshot(
 
   const completed = courses.filter((c) => c.completed).length;
   const fullName = me.fullName ?? me.email;
+  const code =
+    me.studentCode ?? (await ensureStudentCode(me.id, me.tenantId));
 
   return {
     userId: me.id,
     fullName,
     firstName: fullName.split(" ")[0],
     email: me.email,
-    studentCode: studentCode(me.id, (me.createdAt ?? new Date()).getFullYear()),
+    studentCode: code,
     pointsBalance: me.pointsBalance,
     courses,
     counts: {

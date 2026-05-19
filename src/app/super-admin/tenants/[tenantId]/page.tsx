@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireSuper, type SuperRole } from "@/lib/auth";
 import { canWrite } from "@/lib/super";
 import { TenantEditForm } from "./tenant-edit-form";
+import { OpenAsTenantButton } from "./open-as-tenant-button";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,12 @@ export default async function TenantDetailPage({
         eyebrow={`/${t.slug}`}
         title={t.name}
         description={`Created ${t.createdAt.toISOString().slice(0, 10)} · ${uc?.n ?? 0} users · ${cc?.n ?? 0} courses`}
-        actions={<Badge variant="outline">{t.status}</Badge>}
+        actions={
+          <div className="flex items-center gap-3">
+            <Badge variant="outline">{t.status}</Badge>
+            <OpenAsTenantButton tenantId={t.id} disabled={!writable} />
+          </div>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-3">

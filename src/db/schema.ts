@@ -229,6 +229,10 @@ export const users = pgTable(
     pointsBalance: integer("points_balance").notNull().default(0),
     currentTier: referralTierEnum("current_tier").notNull().default("NONE"),
     tierUnlockedAt: jsonb("tier_unlocked_at"),
+    // Persisted unique, tenant-scoped student id (e.g. "acme-k7r2p9").
+    // Nullable: only STUDENT users get one (assigned on first dashboard view
+    // / backfill). Postgres allows many NULLs under the unique index.
+    studentCode: varchar("student_code", { length: 40 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -238,6 +242,7 @@ export const users = pgTable(
     index("users_role_idx").on(t.role),
     index("users_tenant_idx").on(t.tenantId),
     uniqueIndex("users_referral_code_idx").on(t.referralCode),
+    uniqueIndex("users_student_code_idx").on(t.studentCode),
   ],
 );
 

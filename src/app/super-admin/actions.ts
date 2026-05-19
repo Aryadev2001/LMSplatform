@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { clerkClient } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -15,6 +17,7 @@ import {
 import { requireSuper, type SuperRole, CANONICAL_ADMIN } from "@/lib/auth";
 import { canWrite, canManageTeam } from "@/lib/super";
 import { recordAudit } from "@/lib/audit";
+import { IMPERSONATION_COOKIE } from "@/lib/impersonation";
 import { RESERVED_SUBDOMAINS } from "@/lib/tenant";
 
 type Result = { success: true } | { success: false; error: string };
@@ -459,4 +462,59 @@ export async function syncMasterCourse(input: unknown): Promise<Result> {
 
   revalidatePath("/super-admin/courses");
   return { success: true };
+}
+
+/**
+ * Super-admin "open dashboard as this tenant". Sets the impersonation
+ * cookie (re-verified as super on every request) and audits it. Full
+ * access — actions taken while impersonating still flow through the
+ * normal per-request audit log; start/stop is explicitly recorded.
+ */
+export async function impersonateTenant(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role — you cannot open tenant accounts." };
+  }
+  const parsed = z.object({ tenantId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid tenant." };
+
+  const [t] = await db
+    .select({ id: tenants.id, name: tenants.name })
+    .from(tenants)
+    .where(eq(tenants.id, parsed.data.tenantId))
+    .limit(1);
+  if (!t) return { success: false, error: "Tenant not found." };
+
+  const jar = await cookies();
+  jar.set(IMPERSONATION_COOKIE, t.id, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+  });
+
+  await recordAudit({
+    action: "tenant.impersonate.start",
+    targetType: "tenant",
+    targetId: t.id,
+    metadata: { name: t.name },
+  });
+
+  redirect("/admin");
+}
+
+/** Exit impersonation and return to the super-admin console. Audited. */
+export async function stopImpersonation(): Promise<Result> {
+  const me = await requireSuper();
+  const jar = await cookies();
+  const current = jar.get(IMPERSONATION_COOKIE)?.value ?? null;
+  jar.delete(IMPERSONATION_COOKIE);
+
+  await recordAudit({
+    action: "tenant.impersonate.stop",
+    targetType: "tenant",
+    targetId: current ?? "unknown",
+    metadata: { by: me.rawRole },
+  });
+
+  redirect("/super-admin/tenants");
 }

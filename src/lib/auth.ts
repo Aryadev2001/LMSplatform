@@ -2,8 +2,9 @@ import { cache } from "react";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db } from "@/db/client";
-import { users } from "@/db/schema";
+import { users, tenants } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getImpersonatedTenantId } from "@/lib/impersonation";
 
 /** Raw role values stored in the DB (legacy + phase-7). */
 export type RawRole =
@@ -54,10 +55,12 @@ export function normalizeRole(raw: RawRole | null | undefined): UserRole | null 
 
 export interface CurrentUser {
   userId: string; // clerk id
-  role: UserRole | null; // normalized
-  rawRole: RawRole | null; // exact DB role (for super-admin gating)
-  tenantId: string | null;
+  role: UserRole | null; // normalized (effective — may be "admin" while a
+  // super-admin is impersonating a tenant)
+  rawRole: RawRole | null; // exact DB role — ALWAYS the real one (super gating)
+  tenantId: string | null; // effective tenant (impersonated one for a super)
   email?: string;
+  impersonating?: boolean; // true when a super-admin is acting as a tenant
 }
 
 /**
@@ -65,7 +68,7 @@ export interface CurrentUser {
  * DB is the source of truth post phase-7 (Clerk session-token claim is a fast
  * path but our DB carries the canonical role + tenantId).
  */
-export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+const resolveCurrentUser = async (): Promise<CurrentUser | null> => {
   const { userId } = await auth();
   if (!userId) return null;
 
@@ -162,7 +165,37 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   } catch {
     return { userId, rawRole: null, role: null, tenantId: null };
   }
-});
+};
+
+/**
+ * Apply the super-admin tenant-impersonation overlay. Only a verified
+ * SUPER_* session user can be overlaid; rawRole stays the real super role
+ * (so /super-admin + Exit still work), but role/tenantId become an effective
+ * tenant-admin scoped to the impersonated tenant.
+ */
+async function applyImpersonation(
+  base: CurrentUser | null,
+): Promise<CurrentUser | null> {
+  if (!base || !SUPER_ROLES.includes(base.rawRole as RawRole)) return base;
+  const tenantId = await getImpersonatedTenantId();
+  if (!tenantId) return base;
+  const [t] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!t) return base;
+  return { ...base, role: "admin", tenantId, impersonating: true };
+}
+
+/**
+ * Resolves the current user (cached per request), with the super-admin
+ * impersonation overlay applied.
+ */
+export const getCurrentUser = cache(
+  async (): Promise<CurrentUser | null> =>
+    applyImpersonation(await resolveCurrentUser()),
+);
 
 /**
  * Gate a tenant-dashboard route by normalized role. Unchanged signature so all
