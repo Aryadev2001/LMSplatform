@@ -117,11 +117,6 @@ export function useCart() {
   return { items, add, remove, clear, count: items.length };
 }
 
-/** Tax rule by billing country (master prompt §8.5). */
-export function taxRateFor(country: string): { rate: number; label: string } {
-  const c = country.trim().toLowerCase();
-  if (["ae", "uae", "united arab emirates"].includes(c))
-    return { rate: 0.05, label: "VAT 5%" };
-  if (["in", "india"].includes(c)) return { rate: 0.18, label: "GST 18%" };
-  return { rate: 0, label: "Tax" };
-}
+// Re-exported so existing `import { taxRateFor } from "@/lib/cart"` callers
+// keep working; the single source of truth is the framework-free module.
+export { taxRateFor } from "@/lib/tax";
