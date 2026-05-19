@@ -1,15 +1,23 @@
 import Link from "next/link";
-import { Search } from "lucide-react";
+import {
+  Search,
+  User,
+  Briefcase,
+  GraduationCap,
+  BadgeCheck,
+  Landmark,
+  Palette,
+} from "lucide-react";
 import { EuroLogo } from "./euro-logo";
 import { CartIndicator } from "./cart-button";
 
 export const EURO_CATEGORIES = [
-  { slug: "individuals", label: "Individuals" },
-  { slug: "business", label: "Business" },
-  { slug: "academic", label: "Academic" },
-  { slug: "certification", label: "Certification" },
-  { slug: "government", label: "Government" },
-  { slug: "hobby", label: "Hobby & Skills" },
+  { slug: "individuals", label: "Individuals", icon: User },
+  { slug: "business", label: "Business", icon: Briefcase },
+  { slug: "academic", label: "Academic", icon: GraduationCap },
+  { slug: "certification", label: "Certification", icon: BadgeCheck },
+  { slug: "government", label: "Government", icon: Landmark },
+  { slug: "hobby", label: "Hobby & Skills", icon: Palette },
 ] as const;
 
 export function EuroNav() {

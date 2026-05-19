@@ -59,9 +59,11 @@ export default async function HomePage() {
               style={{ borderColor: "var(--ed-line)" }}
             >
               <div
-                className="mb-3 size-9 rounded-xl"
+                className="mb-3 flex size-11 items-center justify-center rounded-full"
                 style={{ background: CAT_COLORS[i % CAT_COLORS.length] }}
-              />
+              >
+                <cat.icon className="size-5 text-white" />
+              </div>
               <div className="text-sm font-bold" style={{ color: "var(--ed-ink)" }}>
                 {cat.label}
               </div>
