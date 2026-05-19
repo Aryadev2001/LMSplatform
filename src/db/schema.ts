@@ -13,7 +13,7 @@ import {
   doublePrecision,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ---------- Enums ----------
 // Legacy lowercase values kept (Postgres can't drop enum values); phase-7
@@ -115,6 +115,37 @@ export const courseStatusEnum = pgEnum("course_status", [
   "draft",
   "published",
   "archived",
+]);
+
+// ---------- Phase 2: Payments / cart ----------
+export const cartStatusEnum = pgEnum("cart_status", [
+  "open",
+  "converted",
+  "abandoned",
+]);
+export const couponDiscountTypeEnum = pgEnum("coupon_discount_type", [
+  "percent",
+  "fixed",
+]);
+export const orderStatusEnum = pgEnum("order_status", [
+  "pending",
+  "paid",
+  "failed",
+  "cancelled",
+  "refunded",
+]);
+export const paymentIntentStatusEnum = pgEnum("payment_intent_status", [
+  "requires_payment",
+  "processing",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "refunded",
+]);
+export const refundStatusEnum = pgEnum("refund_status", [
+  "pending",
+  "succeeded",
+  "failed",
 ]);
 
 // ---------- Phase 7: Tenant ----------
@@ -386,6 +417,12 @@ export const payments = pgTable(
       onDelete: "cascade",
     }),
     pointsRedeemed: integer("points_redeemed").notNull().default(0),
+    // Phase 2 — order linkage + tax + gateway provider
+    orderId: uuid("order_id").references((): AnyPgColumn => orders.id, {
+      onDelete: "set null",
+    }),
+    taxCents: integer("tax_cents").notNull().default(0),
+    provider: varchar("provider", { length: 20 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -393,6 +430,7 @@ export const payments = pgTable(
     index("payments_student_idx").on(t.studentUserId),
     index("payments_status_idx").on(t.status),
     index("payments_tenant_idx").on(t.tenantId),
+    index("payments_order_idx").on(t.orderId),
     uniqueIndex("payments_pi_idx").on(t.stripePaymentIntentId),
   ],
 );
@@ -752,4 +790,257 @@ export const auditLogs = pgTable(
     index("audit_actor_idx").on(t.actorUserId),
     index("audit_created_idx").on(t.createdAt),
   ],
+);
+
+// ========== Phase 2: Cart / Orders / Payments ==========
+
+export const carts = pgTable(
+  "carts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: cartStatusEnum("status").notNull().default("open"),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("carts_user_open_idx")
+      .on(t.userId)
+      .where(sql`${t.status} = 'open'`),
+  ],
+);
+
+export const cartItems = pgTable(
+  "cart_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    cartId: uuid("cart_id")
+      .notNull()
+      .references(() => carts.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    quantity: integer("quantity").notNull().default(1),
+    addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("cart_items_cart_program_idx").on(t.cartId, t.programId),
+    index("cart_items_cart_idx").on(t.cartId),
+    index("cart_items_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const coupons = pgTable(
+  "coupons",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // null = platform-wide; set = institute-scoped
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "cascade",
+    }),
+    code: varchar("code", { length: 40 }).notNull(),
+    discountType: couponDiscountTypeEnum("discount_type").notNull(),
+    discountValue: integer("discount_value").notNull(),
+    currency: varchar("currency", { length: 3 }),
+    minSubtotalCents: integer("min_subtotal_cents").notNull().default(0),
+    maxRedemptions: integer("max_redemptions"),
+    redeemedCount: integer("redeemed_count").notNull().default(0),
+    perUserLimit: integer("per_user_limit").notNull().default(1),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("coupons_tenant_code_idx").on(t.tenantId, t.code),
+    index("coupons_code_idx").on(t.code),
+  ],
+);
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderRef: varchar("order_ref", { length: 30 }).notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "set null" }),
+    status: orderStatusEnum("status").notNull().default("pending"),
+    billingName: varchar("billing_name", { length: 160 }),
+    billingEmail: varchar("billing_email", { length: 200 }),
+    billingCountry: varchar("billing_country", { length: 2 }),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    subtotalCents: integer("subtotal_cents").notNull(),
+    discountCents: integer("discount_cents").notNull().default(0),
+    pointsRedeemedCents: integer("points_redeemed_cents").notNull().default(0),
+    taxCents: integer("tax_cents").notNull().default(0),
+    taxRateBps: integer("tax_rate_bps").notNull().default(0),
+    totalCents: integer("total_cents").notNull(),
+    couponId: uuid("coupon_id").references(() => coupons.id, {
+      onDelete: "set null",
+    }),
+    paymentProvider: varchar("payment_provider", { length: 20 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("orders_order_ref_idx").on(t.orderRef),
+    index("orders_user_idx").on(t.userId),
+    index("orders_status_idx").on(t.status),
+  ],
+);
+
+export const orderItems = pgTable(
+  "order_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "restrict" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    enrollmentId: uuid("enrollment_id").references(() => enrollments.id, {
+      onDelete: "set null",
+    }),
+    paymentId: uuid("payment_id").references(() => payments.id, {
+      onDelete: "set null",
+    }),
+    title: varchar("title", { length: 300 }).notNull(),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    quantity: integer("quantity").notNull().default(1),
+    discountCents: integer("discount_cents").notNull().default(0),
+    taxCents: integer("tax_cents").notNull().default(0),
+    lineTotalCents: integer("line_total_cents").notNull(),
+    platformFeeCents: integer("platform_fee_cents").notNull().default(0),
+    partnerPayoutCents: integer("partner_payout_cents").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("order_items_order_idx").on(t.orderId),
+    index("order_items_tenant_idx").on(t.tenantId),
+    index("order_items_program_idx").on(t.programId),
+  ],
+);
+
+export const couponRedemptions = pgTable(
+  "coupon_redemptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    couponId: uuid("coupon_id")
+      .notNull()
+      .references(() => coupons.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amountCents: integer("amount_cents").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("coupon_redemptions_coupon_user_order_idx").on(
+      t.couponId,
+      t.userId,
+      t.orderId,
+    ),
+  ],
+);
+
+export const paymentIntents = pgTable(
+  "payment_intents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "set null",
+    }),
+    provider: varchar("provider", { length: 20 }).notNull(),
+    providerIntentId: varchar("provider_intent_id", { length: 200 }),
+    clientSecret: text("client_secret"),
+    amountCents: integer("amount_cents").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    status: paymentIntentStatusEnum("status")
+      .notNull()
+      .default("requires_payment"),
+    rawPayload: jsonb("raw_payload"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("payment_intents_order_idx").on(t.orderId)],
+);
+
+export const paymentWebhooks = pgTable(
+  "payment_webhooks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: varchar("provider", { length: 20 }).notNull(),
+    eventId: varchar("event_id", { length: 200 }).notNull(),
+    eventType: varchar("event_type", { length: 80 }),
+    orderId: uuid("order_id").references(() => orders.id, {
+      onDelete: "set null",
+    }),
+    paymentIntentId: uuid("payment_intent_id").references(
+      () => paymentIntents.id,
+      { onDelete: "set null" },
+    ),
+    payload: jsonb("payload"),
+    signatureValid: boolean("signature_valid").notNull().default(false),
+    processed: boolean("processed").notNull().default(false),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("payment_webhooks_provider_event_idx").on(
+      t.provider,
+      t.eventId,
+    ),
+  ],
+);
+
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    orderItemId: uuid("order_item_id").references(() => orderItems.id, {
+      onDelete: "set null",
+    }),
+    paymentId: uuid("payment_id").references(() => payments.id, {
+      onDelete: "set null",
+    }),
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "set null",
+    }),
+    provider: varchar("provider", { length: 20 }),
+    providerRefundId: varchar("provider_refund_id", { length: 200 }),
+    amountCents: integer("amount_cents").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    reason: varchar("reason", { length: 300 }),
+    status: refundStatusEnum("status").notNull().default("pending"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [index("refunds_order_idx").on(t.orderId)],
 );
