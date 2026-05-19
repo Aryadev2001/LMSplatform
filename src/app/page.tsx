@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Search, ArrowRight, ShieldCheck, Star } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import { EuroNav, EURO_CATEGORIES } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { EuroCourseCard } from "@/components/euro/course-card";
+import { ProgressiveHero } from "@/components/ui/progressive-hero";
 import {
   getMarketStats,
   getMarketCourses,
@@ -45,70 +46,7 @@ export default async function HomePage() {
       <EuroNav />
 
       {/* Hero */}
-      <section className="relative overflow-hidden border-b" style={{ borderColor: "var(--ed-line)" }}>
-        <div className="absolute inset-0 opacity-60" style={{ background: "var(--ed-halftone)" }} />
-        <div className="relative mx-auto max-w-7xl px-6 py-20 text-center">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white"
-            style={{ background: "var(--ed-ink)" }}
-          >
-            <ShieldCheck className="size-3.5" /> {stats.institutes}+ Verified Institutes
-          </span>
-          <h1
-            className="mx-auto mt-6 max-w-3xl text-balance text-4xl font-extrabold leading-[1.1] tracking-tight md:text-6xl"
-            style={{ color: "var(--ed-ink)" }}
-          >
-            Unlock your next chapter.{" "}
-            <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: "var(--ed-gradient)" }}
-            >
-              Learn from the best.
-            </span>{" "}
-            Earn while you grow.
-          </h1>
-          <p
-            className="mx-auto mt-5 max-w-2xl text-balance md:text-lg"
-            style={{ color: "var(--ed-mute)" }}
-          >
-            From entrance prep to PhD, certifications to corporate training —
-            discover courses curated from universities and industry leaders.
-          </p>
-
-          <form
-            action="/explore"
-            className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-2xl border bg-white p-2 shadow-sm"
-            style={{ borderColor: "var(--ed-line)" }}
-          >
-            <Search className="ml-2 size-5" style={{ color: "var(--ed-mute)" }} />
-            <input
-              name="q"
-              placeholder="What do you want to learn today?"
-              className="h-11 flex-1 bg-transparent px-1 text-sm outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded-xl px-5 py-2.5 text-sm font-bold text-white"
-              style={{ background: "var(--ed-gradient)" }}
-            >
-              Search
-            </button>
-          </form>
-
-          <div className="mx-auto mt-10 grid max-w-2xl grid-cols-4 gap-4">
-            {statTiles.map((s) => (
-              <div key={s.label}>
-                <div className="text-2xl font-extrabold md:text-3xl" style={{ color: "var(--ed-ink)" }}>
-                  {s.value}
-                </div>
-                <div className="text-[10px] font-bold tracking-widest" style={{ color: "var(--ed-mute)" }}>
-                  {s.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ProgressiveHero institutes={stats.institutes} statTiles={statTiles} />
 
       {/* Categories */}
       <section className="mx-auto max-w-7xl px-6 py-14">
