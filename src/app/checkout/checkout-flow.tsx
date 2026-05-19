@@ -6,7 +6,36 @@ import { toast } from "sonner";
 import { Loader2, Lock, ChevronRight, ChevronLeft } from "lucide-react";
 import { useCart, taxRateFor } from "@/lib/cart";
 import { formatCurrency } from "@/lib/format";
-import { placeOrder } from "./actions";
+import { placeOrder, beginCheckout, confirmCheckout } from "./actions";
+
+interface RazorpayHandlerResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}
+interface RazorpayCtor {
+  new (options: Record<string, unknown>): { open: () => void };
+}
+declare global {
+  interface Window {
+    Razorpay?: RazorpayCtor;
+  }
+}
+
+let rzpScript: Promise<boolean> | null = null;
+function loadRazorpay(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (window.Razorpay) return Promise.resolve(true);
+  if (rzpScript) return rzpScript;
+  rzpScript = new Promise<boolean>((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+  return rzpScript;
+}
 
 const COUNTRIES = [
   { code: "AE", label: "United Arab Emirates" },
@@ -47,21 +76,75 @@ export function CheckoutFlow({ pointsBalance }: { pointsBalance: number }) {
     [items],
   );
 
+  const payload = {
+    programIds: items.map((i) => i.programId),
+    billingCountry: bill.country,
+    redeemPoints: usePts > 0 && singleInstitute,
+  };
+
+  function goSuccess(orderRef: string, n: number) {
+    clear();
+    router.push(
+      `/checkout/success?ref=${encodeURIComponent(orderRef)}&items=${n}`,
+    );
+  }
+
+  async function runMock() {
+    const r = await placeOrder(payload);
+    if (r.success) goSuccess(r.orderRef, r.items);
+    else toast.error(r.error);
+  }
+
   function submit() {
     startTransition(async () => {
-      const r = await placeOrder({
-        programIds: items.map((i) => i.programId),
-        billingCountry: bill.country,
-        redeemPoints: usePts > 0 && singleInstitute,
-      });
-      if (r.success) {
-        clear();
-        router.push(
-          `/checkout/success?ref=${encodeURIComponent(r.orderRef)}&items=${r.items}`,
-        );
-      } else {
-        toast.error(r.error);
+      const b = await beginCheckout(payload);
+      if (!b.ok) {
+        toast.error(b.error);
+        return;
       }
+
+      if (b.provider === "mock") {
+        await runMock();
+        return;
+      }
+
+      if (b.provider === "stripe") {
+        window.location.href = b.checkoutUrl; // hosted Stripe Checkout
+        return;
+      }
+
+      // Razorpay — Standard Checkout, verified server-side on success.
+      const ready = await loadRazorpay();
+      if (!ready || !window.Razorpay) {
+        toast.error("Could not load the payment window. Try again.");
+        return;
+      }
+      const rzp = new window.Razorpay({
+        key: b.keyId,
+        order_id: b.rzpOrderId,
+        amount: b.amountCents,
+        currency: b.currency,
+        name: b.institute,
+        description: `Order ${b.orderRef}`,
+        prefill: { email: b.email },
+        handler: (resp: RazorpayHandlerResponse) => {
+          startTransition(async () => {
+            const c = await confirmCheckout({
+              provider: "razorpay",
+              orderId: b.orderId,
+              razorpayOrderId: resp.razorpay_order_id,
+              razorpayPaymentId: resp.razorpay_payment_id,
+              razorpaySignature: resp.razorpay_signature,
+            });
+            if (c.success) goSuccess(c.orderRef, c.items);
+            else toast.error(c.error);
+          });
+        },
+        modal: {
+          ondismiss: () => toast("Payment cancelled — your cart is saved."),
+        },
+      });
+      rzp.open();
     });
   }
 

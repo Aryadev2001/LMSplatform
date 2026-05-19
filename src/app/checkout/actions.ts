@@ -5,21 +5,21 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   programs,
-  enrollments,
-  payments,
-  students,
-  users,
-  carts,
   orders,
   orderItems,
+  paymentIntents,
+  users,
   tenants,
 } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { taxRateFor } from "@/lib/tax";
+import { computeRedeemable } from "@/lib/referral";
+import { fulfillOrderById } from "@/lib/payments/fulfill";
 import {
-  redeemPointsAtCheckout,
-  awardReferralForPurchase,
-} from "@/lib/referral";
+  resolveTenantGateway,
+  createGatewayCharge,
+  verifyGatewayPayment,
+} from "@/lib/payments/gateway";
 
 const Schema = z.object({
   programIds: z.array(z.string().uuid()).min(1).max(20),
@@ -47,48 +47,62 @@ const DEFAULT_PLATFORM_FEE_BPS = 1500; // 15%
 const clampBps = (n: number | null | undefined) =>
   Math.min(5000, Math.max(0, n ?? DEFAULT_PLATFORM_FEE_BPS));
 
-/**
- * MOCK order placement — no live Stripe/Razorpay charge yet (that is the
- * dedicated money-path build). For an authenticated learner it now writes
- * a real `orders` + `order_items` record (with tax + per-institute
- * platform-fee / partner-payout split) alongside the enrollment + payment
- * rows that grant access, and applies the verified points + referral
- * engine.
- *
- * NOTE: the neon-http driver has no interactive transactions, so these
- * writes are sequential, not atomic. The order row is created first so
- * every child FK is valid; a mid-flight failure would leave a partial
- * order. Real atomicity (pool driver / webhook reconciliation) comes with
- * live payment processing.
- */
-export async function placeOrder(input: unknown): Promise<Result> {
-  const me = await getCurrentUser();
-  if (!me) return { success: false, error: "Please sign in to check out." };
+const appBaseUrl = () =>
+  process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+interface CheckoutCtx {
+  dbUser: { id: string; email: string; fullName: string | null };
+  progs: {
+    id: string;
+    name: string;
+    priceCents: number;
+    currency: string;
+    tenantId: string;
+    platformFeeBps: number | null;
+  }[];
+  currency: string;
+  singleTenant: boolean;
+  tenantId: string;
+  subtotalCents: number;
+  taxRateBps: number;
+  taxCentsTotal: number;
+  taxByIndex: number[];
+  orderRef: string;
+  billingCountry: string | null;
+}
+
+/**
+ * Validate the cart, resolve the buyer + purchasable programs, enforce
+ * single-currency, and compute money (tax + per-line allocation). Shared
+ * by the mock path and the live gateway path so the numbers can never
+ * diverge between "what we show / charge" and "what we record".
+ */
+async function loadCheckout(
+  input: unknown,
+  clerkUserId: string,
+): Promise<{ ok: true; ctx: CheckoutCtx } | { ok: false; error: string }> {
   const parsed = Schema.safeParse(input);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid cart" };
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid cart",
+    };
   }
 
   const [dbUser] = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      fullName: users.fullName,
-    })
+    .select({ id: users.id, email: users.email, fullName: users.fullName })
     .from(users)
-    .where(eq(users.clerkId, me.userId))
+    .where(eq(users.clerkId, clerkUserId))
     .limit(1);
-  if (!dbUser) return { success: false, error: "Account not provisioned yet." };
+  if (!dbUser) return { ok: false, error: "Account not provisioned yet." };
 
-  const progs = await db
+  const rows = await db
     .select({
       id: programs.id,
       name: programs.name,
       priceCents: programs.priceCents,
       currency: programs.currency,
       tenantId: programs.tenantId,
-      status: programs.status,
       platformFeeBps: tenants.platformFeeBps,
     })
     .from(programs)
@@ -100,33 +114,28 @@ export async function placeOrder(input: unknown): Promise<Result> {
       ),
     );
 
-  if (progs.length === 0) {
-    return { success: false, error: "No purchasable items in cart." };
+  if (rows.length === 0) {
+    return { ok: false, error: "No purchasable items in cart." };
   }
-  if (progs.some((p) => !p.tenantId)) {
-    return { success: false, error: "An item is not available for purchase." };
+  if (rows.some((p) => !p.tenantId)) {
+    return { ok: false, error: "An item is not available for purchase." };
   }
+  const progs = rows.map((p) => ({ ...p, tenantId: p.tenantId as string }));
 
-  // One order = one currency (money-correctness; the cart UI already warns
-  // about mixed currencies). Mixed → check out one institute at a time.
   const currency = progs[0].currency;
   if (progs.some((p) => p.currency !== currency)) {
     return {
-      success: false,
+      ok: false,
       error:
         "Your cart mixes currencies — please check out one institute at a time.",
     };
   }
   const singleTenant = progs.every((p) => p.tenantId === progs[0].tenantId);
 
-  // Money — mirrors the checkout UI exactly so the charged total equals the
-  // shown total: tax on subtotal (pre-points), points subtracted after.
   const subtotalCents = progs.reduce((s, p) => s + p.priceCents, 0);
   const tax = taxRateFor(parsed.data.billingCountry);
   const taxCentsTotal = Math.round(subtotalCents * tax.rate);
 
-  // Proportional per-line tax allocation; last line absorbs the rounding
-  // remainder so Σ line tax === order tax.
   const taxByIndex: number[] = [];
   let taxAllocated = 0;
   progs.forEach((p, i) => {
@@ -150,75 +159,60 @@ export async function placeOrder(input: unknown): Promise<Result> {
       ? parsed.data.billingCountry.toUpperCase()
       : null;
 
-  // Order header first so every child FK (order_items, payments.order_id)
-  // is valid. Finalized to "paid" once the lines succeed.
+  return {
+    ok: true,
+    ctx: {
+      dbUser,
+      progs,
+      currency,
+      singleTenant,
+      tenantId: progs[0].tenantId,
+      subtotalCents,
+      taxRateBps: tax.rateBps,
+      taxCentsTotal,
+      taxByIndex,
+      orderRef,
+      billingCountry,
+    },
+  };
+}
+
+/**
+ * Create the pending order + its lines (enrollment/payment are filled in by
+ * fulfilment once paid). Returns the new order id.
+ */
+async function insertPendingOrder(
+  ctx: CheckoutCtx,
+  provider: string,
+): Promise<string> {
   const [order] = await db
     .insert(orders)
     .values({
-      orderRef,
-      userId: dbUser.id,
+      orderRef: ctx.orderRef,
+      userId: ctx.dbUser.id,
       status: "pending",
-      billingName: dbUser.fullName ?? dbUser.email,
-      billingEmail: dbUser.email,
-      billingCountry,
-      currency,
-      subtotalCents,
-      taxCents: taxCentsTotal,
-      taxRateBps: tax.rateBps,
-      totalCents: subtotalCents + taxCentsTotal,
-      paymentProvider: "test",
+      billingName: ctx.dbUser.fullName ?? ctx.dbUser.email,
+      billingEmail: ctx.dbUser.email,
+      billingCountry: ctx.billingCountry,
+      currency: ctx.currency,
+      subtotalCents: ctx.subtotalCents,
+      taxCents: ctx.taxCentsTotal,
+      taxRateBps: ctx.taxRateBps,
+      totalCents: ctx.subtotalCents + ctx.taxCentsTotal,
+      paymentProvider: provider,
     })
     .returning({ id: orders.id });
 
-  // Per item: enrollment → payment (mock succeeded) → order_item → access.
-  const created: {
-    paymentId: string;
-    tenantId: string;
-    amountCents: number;
-  }[] = [];
-  for (let i = 0; i < progs.length; i++) {
-    const p = progs[i];
-    const lineTax = taxByIndex[i];
+  for (let i = 0; i < ctx.progs.length; i++) {
+    const p = ctx.progs[i];
+    const lineTax = ctx.taxByIndex[i];
     const platformFeeCents = Math.round(
       (p.priceCents * clampBps(p.platformFeeBps)) / 10000,
     );
-    const partnerPayoutCents = p.priceCents - platformFeeCents;
-
-    const [enr] = await db
-      .insert(enrollments)
-      .values({
-        fullName: dbUser.fullName ?? dbUser.email,
-        email: dbUser.email,
-        programId: p.id,
-        status: "paid",
-        userId: dbUser.id,
-      })
-      .returning({ id: enrollments.id });
-
-    const [pay] = await db
-      .insert(payments)
-      .values({
-        enrollmentId: enr.id,
-        studentUserId: dbUser.id,
-        amountCents: p.priceCents,
-        taxCents: lineTax,
-        currency: p.currency,
-        status: "succeeded",
-        description: `${p.name} — ${orderRef}`,
-        paymentMethodLabel: "Test mode",
-        provider: "test",
-        stripePaymentIntentId: `pi_mock_${Math.random().toString(36).slice(2, 12)}`,
-        tenantId: p.tenantId,
-        orderId: order.id,
-      })
-      .returning({ id: payments.id });
-
     await db.insert(orderItems).values({
       orderId: order.id,
       programId: p.id,
-      tenantId: p.tenantId as string,
-      enrollmentId: enr.id,
-      paymentId: pay.id,
+      tenantId: p.tenantId,
       title: p.name,
       unitPriceCents: p.priceCents,
       currency: p.currency,
@@ -226,101 +220,285 @@ export async function placeOrder(input: unknown): Promise<Result> {
       taxCents: lineTax,
       lineTotalCents: p.priceCents,
       platformFeeCents,
-      partnerPayoutCents,
-    });
-
-    const [stu] = await db
-      .select({ userId: students.userId })
-      .from(students)
-      .where(eq(students.userId, dbUser.id))
-      .limit(1);
-    if (!stu) {
-      await db.insert(students).values({
-        userId: dbUser.id,
-        enrollmentId: enr.id,
-        assignedProgramId: p.id,
-      });
-    } else {
-      await db
-        .update(students)
-        .set({ assignedProgramId: p.id, enrollmentId: enr.id })
-        .where(eq(students.userId, dbUser.id));
-    }
-
-    await db
-      .update(enrollments)
-      .set({ status: "account_created", userId: dbUser.id, updatedAt: new Date() })
-      .where(eq(enrollments.id, enr.id));
-
-    created.push({
-      paymentId: pay.id,
-      tenantId: p.tenantId as string,
-      amountCents: p.priceCents,
+      partnerPayoutCents: p.priceCents - platformFeeCents,
     });
   }
+  return order.id;
+}
 
-  // Points redemption — only for a single-institute cart (per-tenant engine);
-  // mixed-institute carts skip it (conservative, money-correct).
-  let pointsRedeemed = 0;
-  let pointsDiscountCents = 0;
-  if (parsed.data.redeemPoints && singleTenant) {
-    const cartCents = created.reduce((s, c) => s + c.amountCents, 0);
-    const r = await redeemPointsAtCheckout({
-      userId: dbUser.id,
-      tenantId: created[0].tenantId,
-      paymentId: created[0].paymentId,
-      cartCents,
-    });
-    pointsRedeemed = r.points;
-    if (r.discountCents > 0) {
-      pointsDiscountCents = r.discountCents;
-      const net = Math.max(0, created[0].amountCents - r.discountCents);
-      await db
-        .update(payments)
-        .set({ amountCents: net, pointsRedeemed: r.points })
-        .where(eq(payments.id, created[0].paymentId));
-      created[0].amountCents = net;
-    }
+/**
+ * MOCK / fallback order placement — used when the institute has not
+ * connected a live gateway. Creates the order and grants access
+ * immediately via the shared fulfilment path.
+ */
+export async function placeOrder(input: unknown): Promise<Result> {
+  const me = await getCurrentUser();
+  if (!me) return { success: false, error: "Please sign in to check out." };
+
+  const parsed = Schema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid cart" };
   }
 
-  // Referral attribution (verified, idempotent per payment).
-  for (const c of created) {
-    await awardReferralForPurchase({
-      referredUserId: dbUser.id,
-      paymentId: c.paymentId,
-      amountCents: c.amountCents,
-      tenantId: c.tenantId,
-    });
-  }
+  const loaded = await loadCheckout(input, me.userId);
+  if (!loaded.ok) return { success: false, error: loaded.error };
+  const ctx = loaded.ctx;
 
-  // Finalize the order — paid, with the final points-adjusted total.
-  const totalCents = Math.max(
-    0,
-    subtotalCents + taxCentsTotal - pointsDiscountCents,
-  );
-  await db
-    .update(orders)
-    .set({
-      status: "paid",
-      paidAt: new Date(),
-      pointsRedeemedCents: pointsDiscountCents,
-      totalCents,
-      updatedAt: new Date(),
-    })
-    .where(eq(orders.id, order.id));
-
-  // Empty the persisted cart — the open cart becomes this purchase.
-  await db
-    .update(carts)
-    .set({ status: "converted", updatedAt: new Date() })
-    .where(and(eq(carts.userId, dbUser.id), eq(carts.status, "open")));
+  const orderId = await insertPendingOrder(ctx, "test");
+  const f = await fulfillOrderById(orderId, {
+    provider: "test",
+    paymentLabel: "Test mode",
+    providerPaymentId: null,
+    redeemPoints: parsed.data.redeemPoints,
+  });
+  if (!f.ok) return { success: false, error: f.error };
 
   return {
     success: true,
-    orderRef,
-    orderId: order.id,
-    items: created.length,
-    currency,
-    pointsRedeemed,
+    orderRef: f.orderRef,
+    orderId,
+    items: f.items,
+    currency: ctx.currency,
+    pointsRedeemed: f.pointsRedeemed,
+  };
+}
+
+type BeginResult =
+  | { ok: true; provider: "mock" }
+  | {
+      ok: true;
+      provider: "razorpay";
+      orderId: string;
+      orderRef: string;
+      keyId: string;
+      rzpOrderId: string;
+      amountCents: number;
+      currency: string;
+      institute: string;
+      email: string;
+    }
+  | { ok: true; provider: "stripe"; checkoutUrl: string }
+  | { ok: false; error: string };
+
+/**
+ * Live checkout — single institute only (per-tenant gateways cannot be
+ * combined). Creates the pending order, computes the net charge (points
+ * applied up front so the gateway amount equals the net owed), and opens
+ * the charge on the institute's own gateway. If the institute has not
+ * connected a gateway we tell the client to use the mock path instead.
+ */
+export async function beginCheckout(input: unknown): Promise<BeginResult> {
+  const me = await getCurrentUser();
+  if (!me) return { ok: false, error: "Please sign in to check out." };
+
+  const parsed = Schema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid cart" };
+
+  const loaded = await loadCheckout(input, me.userId);
+  if (!loaded.ok) return { ok: false, error: loaded.error };
+  const ctx = loaded.ctx;
+
+  if (!ctx.singleTenant) {
+    return {
+      ok: false,
+      error:
+        "Live checkout is one institute at a time — your cart has courses from more than one institute.",
+    };
+  }
+
+  const gw = await resolveTenantGateway(ctx.tenantId);
+  if (gw.provider === "none") {
+    return { ok: true, provider: "mock" };
+  }
+
+  // Net charge = subtotal + tax − points (computed up front so the gateway
+  // amount equals the net owed; fulfilment records the ledger).
+  let pointsDiscountCents = 0;
+  if (parsed.data.redeemPoints) {
+    const [u] = await db
+      .select({ bal: users.pointsBalance })
+      .from(users)
+      .where(eq(users.id, ctx.dbUser.id))
+      .limit(1);
+    const [t] = await db
+      .select({ maxPct: tenants.referralRedeemMaxPercent })
+      .from(tenants)
+      .where(eq(tenants.id, ctx.tenantId))
+      .limit(1);
+    pointsDiscountCents = computeRedeemable({
+      pointsBalance: u?.bal ?? 0,
+      cartCents: ctx.subtotalCents,
+      redeemMaxPercent: t?.maxPct ?? 0,
+    }).discountCents;
+  }
+  const chargeCents = Math.max(
+    0,
+    ctx.subtotalCents + ctx.taxCentsTotal - pointsDiscountCents,
+  );
+
+  const [tenant] = await db
+    .select({ name: tenants.name })
+    .from(tenants)
+    .where(eq(tenants.id, ctx.tenantId))
+    .limit(1);
+  const institute = tenant?.name ?? "Institute";
+
+  const orderId = await insertPendingOrder(ctx, gw.provider);
+
+  const base = appBaseUrl();
+  const charge = await createGatewayCharge(gw, {
+    amountCents: chargeCents,
+    currency: ctx.currency,
+    orderRef: ctx.orderRef,
+    orderId,
+    institute,
+    email: ctx.dbUser.email,
+    successUrl: `${base}/checkout/success?provider=stripe&order=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${base}/checkout?canceled=1`,
+  });
+
+  const providerIntentId =
+    charge.provider === "razorpay" ? charge.rzpOrderId : charge.sessionId;
+
+  await db.insert(paymentIntents).values({
+    orderId,
+    tenantId: ctx.tenantId,
+    provider: gw.provider,
+    providerIntentId,
+    amountCents: chargeCents,
+    currency: ctx.currency,
+    status: "requires_payment",
+    rawPayload: { redeemPoints: parsed.data.redeemPoints, chargeCents },
+  });
+
+  if (charge.provider === "razorpay") {
+    return {
+      ok: true,
+      provider: "razorpay",
+      orderId,
+      orderRef: ctx.orderRef,
+      keyId: charge.keyId,
+      rzpOrderId: charge.rzpOrderId,
+      amountCents: charge.amountCents,
+      currency: charge.currency,
+      institute,
+      email: ctx.dbUser.email,
+    };
+  }
+  return { ok: true, provider: "stripe", checkoutUrl: charge.url };
+}
+
+const ConfirmSchema = z.discriminatedUnion("provider", [
+  z.object({
+    provider: z.literal("razorpay"),
+    orderId: z.string().uuid(),
+    razorpayOrderId: z.string().min(4).max(120),
+    razorpayPaymentId: z.string().min(4).max(120),
+    razorpaySignature: z.string().min(8).max(256),
+  }),
+  z.object({
+    provider: z.literal("stripe"),
+    orderId: z.string().uuid(),
+    sessionId: z.string().min(8).max(256),
+  }),
+]);
+
+/**
+ * Confirm a live payment with server-side proof (Razorpay HMAC / Stripe
+ * session retrieve) using the institute's own credentials, then grant
+ * access via the shared idempotent fulfilment path.
+ */
+export async function confirmCheckout(input: unknown): Promise<Result> {
+  const me = await getCurrentUser();
+  if (!me) return { success: false, error: "Please sign in." };
+
+  const parsed = ConfirmSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid confirmation." };
+  }
+  const d = parsed.data;
+
+  const [dbUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, me.userId))
+    .limit(1);
+  if (!dbUser) return { success: false, error: "Account missing." };
+
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, d.orderId))
+    .limit(1);
+  if (!order || order.userId !== dbUser.id) {
+    return { success: false, error: "Order not found." };
+  }
+
+  const [pi] = await db
+    .select()
+    .from(paymentIntents)
+    .where(eq(paymentIntents.orderId, d.orderId))
+    .limit(1);
+  if (!pi || !pi.tenantId || pi.provider !== d.provider) {
+    return { success: false, error: "Payment session not found." };
+  }
+
+  const gw = await resolveTenantGateway(pi.tenantId);
+  if (gw.provider === "none" || gw.provider !== d.provider) {
+    return { success: false, error: "Gateway unavailable." };
+  }
+
+  const verified =
+    d.provider === "razorpay" && gw.provider === "razorpay"
+      ? await verifyGatewayPayment(gw, {
+          provider: "razorpay",
+          razorpayOrderId: d.razorpayOrderId,
+          razorpayPaymentId: d.razorpayPaymentId,
+          razorpaySignature: d.razorpaySignature,
+          expectedRzpOrderId: pi.providerIntentId ?? "",
+        })
+      : d.provider === "stripe" && gw.provider === "stripe"
+        ? await verifyGatewayPayment(gw, {
+            provider: "stripe",
+            sessionId: d.sessionId,
+            orderId: d.orderId,
+          })
+        : ({ ok: false, error: "Gateway/payload mismatch." } as const);
+
+  if (!verified.ok) {
+    await db
+      .update(paymentIntents)
+      .set({ status: "failed", updatedAt: new Date() })
+      .where(eq(paymentIntents.id, pi.id));
+    return { success: false, error: verified.error };
+  }
+
+  await db
+    .update(paymentIntents)
+    .set({
+      status: "succeeded",
+      providerIntentId: pi.providerIntentId,
+      updatedAt: new Date(),
+    })
+    .where(eq(paymentIntents.id, pi.id));
+
+  const redeemPoints =
+    !!(pi.rawPayload as { redeemPoints?: boolean } | null)?.redeemPoints;
+
+  const f = await fulfillOrderById(d.orderId, {
+    provider: d.provider,
+    paymentLabel: d.provider === "razorpay" ? "Razorpay" : "Stripe",
+    providerPaymentId: verified.paymentId,
+    redeemPoints,
+  });
+  if (!f.ok) return { success: false, error: f.error };
+
+  return {
+    success: true,
+    orderRef: f.orderRef,
+    orderId: d.orderId,
+    items: f.items,
+    currency: order.currency,
+    pointsRedeemed: f.pointsRedeemed,
   };
 }
