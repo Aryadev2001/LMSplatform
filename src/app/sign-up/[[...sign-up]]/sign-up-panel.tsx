@@ -3,44 +3,97 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SignUp } from "@clerk/nextjs";
-import { GraduationCap, Building2, ArrowRight, Tag } from "lucide-react";
+import {
+  GraduationCap,
+  Building2,
+  ArrowRight,
+  Tag,
+  Check,
+} from "lucide-react";
+import { clerkAppearance } from "@/components/euro/clerk-appearance";
+
+const ROLES = [
+  {
+    id: "learner",
+    label: "Learner",
+    sub: "Take courses & get certified",
+    icon: GraduationCap,
+  },
+  {
+    id: "institute",
+    label: "Institute",
+    sub: "Sell courses to students",
+    icon: Building2,
+  },
+] as const;
 
 export function SignUpPanel({ refCode }: { refCode: string | null }) {
   const [role, setRole] = useState<"learner" | "institute">("learner");
 
   return (
     <div>
-      <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: "var(--ed-ink)" }}>
+      <h2
+        className="font-display text-[26px] leading-tight tracking-tight"
+        style={{ color: "var(--ed-ink)" }}
+      >
         Create your account
       </h2>
-      <p className="mt-1 text-sm" style={{ color: "var(--ed-mute)" }}>
-        Takes less than 60 seconds. No credit card needed.
+      <p className="mt-1.5 text-sm" style={{ color: "var(--ed-mute)" }}>
+        Choose how you want to use eurodigital.coach.
       </p>
 
       {/* Role selector */}
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        {(
-          [
-            { id: "learner", label: "I'm a Learner", icon: GraduationCap },
-            { id: "institute", label: "I'm an Institute", icon: Building2 },
-          ] as const
-        ).map((r) => {
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        {ROLES.map((r) => {
           const active = role === r.id;
           return (
             <button
               key={r.id}
               type="button"
               onClick={() => setRole(r.id)}
-              className="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition-shadow"
+              aria-pressed={active}
+              className="relative flex flex-col gap-2 rounded-2xl border p-4 text-left transition-all"
               style={{
                 borderColor: active ? "var(--ed-blue)" : "var(--ed-line)",
-                boxShadow: active ? "0 0 0 2px var(--ed-blue)" : undefined,
-                color: "var(--ed-ink)",
-                background: "white",
+                background: active ? "rgba(0,174,239,0.05)" : "white",
+                boxShadow: active
+                  ? "0 0 0 3px rgba(0,174,239,0.15)"
+                  : undefined,
               }}
             >
-              <r.icon className="size-4" style={{ color: "var(--ed-blue)" }} />
-              {r.label}
+              <span
+                className="flex size-9 items-center justify-center rounded-xl"
+                style={{
+                  background: active ? "var(--ed-blue)" : "var(--ed-bg)",
+                }}
+              >
+                <r.icon
+                  className="size-4"
+                  style={{ color: active ? "white" : "var(--ed-mute)" }}
+                />
+              </span>
+              <span>
+                <span
+                  className="block text-sm font-bold"
+                  style={{ color: "var(--ed-ink)" }}
+                >
+                  {r.label}
+                </span>
+                <span
+                  className="block text-[12px]"
+                  style={{ color: "var(--ed-mute)" }}
+                >
+                  {r.sub}
+                </span>
+              </span>
+              {active && (
+                <span
+                  className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full"
+                  style={{ background: "var(--ed-blue)" }}
+                >
+                  <Check className="size-3 text-white" strokeWidth={3} />
+                </span>
+              )}
             </button>
           );
         })}
@@ -64,6 +117,7 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
         {role === "learner" ? (
           <div className="euro-clerk">
             <SignUp
+              appearance={clerkAppearance}
               routing="path"
               path="/sign-up"
               signInUrl="/sign-in"
@@ -76,24 +130,44 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
             className="rounded-2xl border p-6 text-center"
             style={{ borderColor: "var(--ed-line)", background: "white" }}
           >
-            <Building2 className="mx-auto size-8" style={{ color: "var(--ed-blue)" }} />
-            <h3 className="mt-3 text-base font-bold" style={{ color: "var(--ed-ink)" }}>
+            <span
+              className="mx-auto flex size-11 items-center justify-center rounded-2xl"
+              style={{ background: "var(--ed-bg)" }}
+            >
+              <Building2
+                className="size-5"
+                style={{ color: "var(--ed-blue)" }}
+              />
+            </span>
+            <h3
+              className="mt-3 text-base font-bold"
+              style={{ color: "var(--ed-ink)" }}
+            >
               Onboard your institute
             </h3>
-            <p className="mt-1 text-sm" style={{ color: "var(--ed-mute)" }}>
-              Institutes set up via our guided 6-step wizard — plan, branding,
-              first course and go live in ~20 minutes.
+            <p
+              className="mt-1 text-sm"
+              style={{ color: "var(--ed-mute)" }}
+            >
+              A guided 6-step setup — plan, branding, your first course, and go
+              live in about 20 minutes.
             </p>
             <Link
               href="/partner/onboard"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
               style={{ background: "var(--ed-gradient)" }}
             >
               Start onboarding <ArrowRight className="size-4" />
             </Link>
-            <p className="mt-3 text-[11px]" style={{ color: "var(--ed-mute)" }}>
+            <p
+              className="mt-3 text-[11px]"
+              style={{ color: "var(--ed-mute)" }}
+            >
               Already a partner?{" "}
-              <Link href="/admin/login" className="font-semibold underline">
+              <Link
+                href="/admin/login"
+                className="font-semibold underline underline-offset-2"
+              >
                 Institute login
               </Link>
             </p>

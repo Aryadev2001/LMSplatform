@@ -4,7 +4,13 @@ import { cn } from "@/lib/utils";
  * eurodigital.coach wordmark — EURO (blue) + DIGITAL (green, halftone
  * overlay) + .coach (ink, lighter). Master prompt §1.2.
  */
-export function EuroLogo({ className }: { className?: string }) {
+export function EuroLogo({
+  className,
+  onDark = false,
+}: {
+  className?: string;
+  onDark?: boolean;
+}) {
   return (
     <span
       className={cn(
@@ -25,7 +31,10 @@ export function EuroLogo({ className }: { className?: string }) {
       >
         digital
       </span>
-      <span className="font-semibold" style={{ color: "var(--ed-ink)" }}>
+      <span
+        className="font-semibold"
+        style={{ color: onDark ? "rgba(255,255,255,0.92)" : "var(--ed-ink)" }}
+      >
         .coach
       </span>
     </span>
