@@ -336,6 +336,14 @@ export async function beginCheckout(input: unknown): Promise<BeginResult> {
     ctx.subtotalCents + ctx.taxCentsTotal - pointsDiscountCents,
   );
 
+  // Free enrolment (₹0 course, or fully covered by points) — never open a
+  // gateway charge for a zero amount (Stripe/Razorpay reject it). Grant via
+  // the free/mock fulfilment path. This is what lets institutes publish
+  // free courses with no payment setup and still enrol students.
+  if (chargeCents <= 0) {
+    return { ok: true, provider: "mock" };
+  }
+
   const [tenant] = await db
     .select({ name: tenants.name })
     .from(tenants)
