@@ -3,7 +3,14 @@
 import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { programs, enrollments, payments, students, users } from "@/db/schema";
+import {
+  programs,
+  enrollments,
+  payments,
+  students,
+  users,
+  carts,
+} from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import {
   redeemPointsAtCheckout,
@@ -175,6 +182,12 @@ export async function placeOrder(input: unknown): Promise<Result> {
       tenantId: c.tenantId,
     });
   }
+
+  // Empty the persisted cart — the open cart becomes this purchase.
+  await db
+    .update(carts)
+    .set({ status: "converted", updatedAt: new Date() })
+    .where(and(eq(carts.userId, dbUser.id), eq(carts.status, "open")));
 
   return {
     success: true,
