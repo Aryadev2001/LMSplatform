@@ -183,6 +183,10 @@ export const tenants = pgTable(
       .notNull()
       .default(50.0),
     referralEnabled: boolean("referral_enabled").notNull().default(true),
+    // Marketplace economics — platform commission in basis points
+    // (1500 = 15%); the institute's payout is the remainder. Super-admin
+    // managed; institutes cannot change their own rate.
+    platformFeeBps: integer("platform_fee_bps").notNull().default(1500),
     // Lifecycle
     status: tenantStatusEnum("status").notNull().default("ACTIVE"),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),

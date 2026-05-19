@@ -73,6 +73,7 @@ export default async function TenantDetailPage({
                   referralEnabled: t.referralEnabled,
                   referralPointsPercent: t.referralPointsPercent,
                   referralRedeemMaxPercent: t.referralRedeemMaxPercent,
+                  platformFeeBps: t.platformFeeBps,
                 }}
               />
             </CardContent>

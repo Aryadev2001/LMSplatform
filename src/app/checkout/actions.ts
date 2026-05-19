@@ -12,6 +12,7 @@ import {
   carts,
   orders,
   orderItems,
+  tenants,
 } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { taxRateFor } from "@/lib/tax";
@@ -38,12 +39,13 @@ type Result =
   | { success: false; error: string };
 
 /**
- * Platform commission, in basis points, taken from each line's gross
- * price; the remainder is the institute's payout. There is no per-tenant
- * commission column yet, so this is a single platform-wide default —
- * revisit when tenants get a negotiated rate.
+ * Fallback platform commission (basis points) if a tenant row somehow
+ * lacks a rate. Real rate is per-tenant (`tenants.platform_fee_bps`,
+ * super-admin managed); this is only a defensive default.
  */
-const PLATFORM_FEE_BPS = 1500; // 15%
+const DEFAULT_PLATFORM_FEE_BPS = 1500; // 15%
+const clampBps = (n: number | null | undefined) =>
+  Math.min(5000, Math.max(0, n ?? DEFAULT_PLATFORM_FEE_BPS));
 
 /**
  * MOCK order placement — no live Stripe/Razorpay charge yet (that is the
@@ -87,8 +89,10 @@ export async function placeOrder(input: unknown): Promise<Result> {
       currency: programs.currency,
       tenantId: programs.tenantId,
       status: programs.status,
+      platformFeeBps: tenants.platformFeeBps,
     })
     .from(programs)
+    .leftJoin(tenants, eq(programs.tenantId, tenants.id))
     .where(
       and(
         inArray(programs.id, parsed.data.programIds),
@@ -176,7 +180,7 @@ export async function placeOrder(input: unknown): Promise<Result> {
     const p = progs[i];
     const lineTax = taxByIndex[i];
     const platformFeeCents = Math.round(
-      (p.priceCents * PLATFORM_FEE_BPS) / 10000,
+      (p.priceCents * clampBps(p.platformFeeBps)) / 10000,
     );
     const partnerPayoutCents = p.priceCents - platformFeeCents;
 

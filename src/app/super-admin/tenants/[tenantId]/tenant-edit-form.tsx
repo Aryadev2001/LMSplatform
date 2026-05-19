@@ -32,6 +32,7 @@ interface Props {
     referralEnabled: boolean;
     referralPointsPercent: number;
     referralRedeemMaxPercent: number;
+    platformFeeBps: number;
   };
 }
 
@@ -56,6 +57,7 @@ export function TenantEditForm({ writable, tenant }: Props) {
         referralEnabled: f.referralEnabled,
         referralPointsPercent: f.referralPointsPercent,
         referralRedeemMaxPercent: f.referralRedeemMaxPercent,
+        platformFeePercent: f.platformFeeBps / 100,
       });
       if (r.success) {
         toast.success("Tenant updated");
@@ -200,6 +202,29 @@ export function TenantEditForm({ writable, tenant }: Props) {
               className="h-10 rounded-xl"
             />
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-black/5 p-4">
+        <Label className="text-sm font-medium">Marketplace economics</Label>
+        <div className="mt-4 max-w-xs space-y-1.5">
+          <Label className="text-xs font-medium">Platform commission %</Label>
+          <Input
+            type="number"
+            step="0.5"
+            min={0}
+            max={50}
+            value={f.platformFeeBps / 100}
+            onChange={(e) =>
+              set("platformFeeBps", Math.round(Number(e.target.value) * 100))
+            }
+            disabled={disabled}
+            className="h-10 rounded-xl"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Taken from each sale; the institute is paid out the remainder.
+            Platform-managed — the institute cannot change this.
+          </p>
         </div>
       </div>
 

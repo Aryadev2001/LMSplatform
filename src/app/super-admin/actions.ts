@@ -112,6 +112,7 @@ const UpdateTenantSchema = z.object({
   referralEnabled: z.boolean(),
   referralPointsPercent: z.coerce.number().min(0).max(100),
   referralRedeemMaxPercent: z.coerce.number().min(0).max(100),
+  platformFeePercent: z.coerce.number().min(0).max(50),
 });
 
 const InviteMemberSchema = z.object({
@@ -233,6 +234,7 @@ export async function updateTenant(input: unknown): Promise<Result> {
       referralEnabled: d.referralEnabled,
       referralPointsPercent: d.referralPointsPercent,
       referralRedeemMaxPercent: d.referralRedeemMaxPercent,
+      platformFeeBps: Math.round(d.platformFeePercent * 100),
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, d.tenantId));
@@ -241,7 +243,11 @@ export async function updateTenant(input: unknown): Promise<Result> {
     action: "tenant.update",
     targetType: "tenant",
     targetId: d.tenantId,
-    metadata: { name: d.name, status: d.status },
+    metadata: {
+      name: d.name,
+      status: d.status,
+      platformFeeBps: Math.round(d.platformFeePercent * 100),
+    },
   });
 
   revalidatePath(`/super-admin/tenants/${d.tenantId}`);
