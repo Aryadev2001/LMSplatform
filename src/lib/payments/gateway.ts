@@ -71,6 +71,42 @@ export async function getTenantWebhookSecret(
   }
 }
 
+/**
+ * Authoritative "did this actually get paid?" from the gateway, by the id
+ * we stored at begin (Stripe session id / Razorpay order id). Used by the
+ * reconciliation backstop when the browser return AND the webhook both
+ * failed to confirm. Never throws — a gateway outage yields `unknown`.
+ */
+export async function fetchGatewayPaymentStatus(
+  gw: Exclude<TenantGateway, { provider: "none" }>,
+  providerIntentId: string,
+): Promise<{ paid: boolean; paymentId: string | null }> {
+  try {
+    if (gw.provider === "stripe") {
+      const stripe = new Stripe(gw.secretKey);
+      const s = await stripe.checkout.sessions.retrieve(providerIntentId);
+      const pi =
+        typeof s.payment_intent === "string"
+          ? s.payment_intent
+          : (s.payment_intent?.id ?? null);
+      return { paid: s.payment_status === "paid", paymentId: pi };
+    }
+    const rzp = new Razorpay({ key_id: gw.keyId, key_secret: gw.keySecret });
+    const order = (await rzp.orders.fetch(providerIntentId)) as {
+      status?: string;
+    };
+    if (order.status !== "paid") return { paid: false, paymentId: null };
+    const list = (await rzp.orders.fetchPayments(providerIntentId)) as {
+      items?: { id: string; status: string }[];
+    };
+    const captured =
+      list.items?.find((p) => p.status === "captured") ?? list.items?.[0];
+    return { paid: true, paymentId: captured?.id ?? null };
+  } catch {
+    return { paid: false, paymentId: null };
+  }
+}
+
 export type ChargeInit =
   | {
       provider: "razorpay";
