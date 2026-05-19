@@ -17,26 +17,26 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     links: [
       { label: "Become a Partner", href: "/partner/onboard" },
       { label: "Partner login", href: "/admin/login" },
-      { label: "Pricing & plans", href: "/admin/login" },
-      { label: "Sell courses", href: "/admin/login" },
+      { label: "Pricing & plans", href: "/pricing" },
+      { label: "Sell courses", href: "/for-institutes" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "About", href: "/" },
-      { label: "Contact", href: "/" },
-      { label: "Help center", href: "/" },
-      { label: "AI Services", href: "/" },
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "Help center", href: "/help" },
+      { label: "For institutes", href: "/for-institutes" },
     ],
   },
   {
     title: "Legal",
     links: [
-      { label: "Terms of Service", href: "/" },
-      { label: "Privacy Policy", href: "/" },
-      { label: "Refund Policy", href: "/" },
-      { label: "Cookie Policy", href: "/" },
+      { label: "Terms of Service", href: "/legal/terms" },
+      { label: "Privacy Policy", href: "/legal/privacy" },
+      { label: "Refund Policy", href: "/legal/refund" },
+      { label: "Cookie Policy", href: "/legal/cookies" },
     ],
   },
 ];
