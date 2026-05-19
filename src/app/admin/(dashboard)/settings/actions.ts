@@ -562,3 +562,71 @@ export async function disconnectStripe(): Promise<
   revalidatePath("/admin/settings");
   return { success: true };
 }
+
+const WebhookSecretSchema = z.object({
+  provider: z.enum(["stripe", "razorpay"]),
+  // Empty string clears the secret (disables that provider's webhooks).
+  secret: z.string().trim().max(256),
+});
+
+/**
+ * Store the tenant's webhook signing secret for a provider, encrypted at
+ * rest (same posture as the gateway keys). Webhooks are optional hardening
+ * on top of return-verification; an empty value clears it. Tenant scope is
+ * from the session — never the client.
+ */
+export async function saveWebhookSecret(
+  input: unknown,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const me = await requireRole("admin");
+  if (!me.tenantId) {
+    return { success: false, error: "Your account is not attached to a tenant." };
+  }
+  const parsed = WebhookSecretSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const { provider, secret } = parsed.data;
+
+  let value: string | null = null;
+  if (secret.length > 0) {
+    if (secret.length < 6) {
+      return { success: false, error: "That secret looks too short." };
+    }
+    if (!encryptionAvailable()) {
+      return {
+        success: false,
+        error:
+          "Secret encryption is not configured on the server — the webhook secret was NOT saved.",
+      };
+    }
+    try {
+      value = encryptSecret(secret);
+    } catch (e) {
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : "Could not encrypt the secret.",
+      };
+    }
+  }
+
+  await db
+    .update(tenants)
+    .set({
+      ...(provider === "stripe"
+        ? { stripeWebhookSecret: value }
+        : { razorpayWebhookSecret: value }),
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, me.tenantId));
+
+  await recordAudit({
+    action: value ? "payment_webhook.configure" : "payment_webhook.clear",
+    targetType: "tenant",
+    targetId: me.tenantId,
+    metadata: { provider },
+  });
+
+  revalidatePath("/admin/settings");
+  return { success: true };
+}

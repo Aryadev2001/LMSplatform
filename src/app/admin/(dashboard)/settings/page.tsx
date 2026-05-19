@@ -98,6 +98,8 @@ export default async function AdminSettingsPage() {
             razorpayKeySecret: tenants.razorpayKeySecret,
             stripePublishableKey: tenants.stripePublishableKey,
             stripeSecretKey: tenants.stripeSecretKey,
+            razorpayWebhookSecret: tenants.razorpayWebhookSecret,
+            stripeWebhookSecret: tenants.stripeWebhookSecret,
             paymentProvider: tenants.paymentProvider,
           })
           .from(tenants)
@@ -218,15 +220,18 @@ export default async function AdminSettingsPage() {
           </CardHeader>
           <CardContent>
             <PaymentGatewayForm
+              tenantId={myTenantId}
               provider={tenantRow.paymentProvider}
               razorpayKeyId={tenantRow.razorpayKeyId}
               razorpayConnected={
                 !!tenantRow.razorpayKeyId && !!tenantRow.razorpayKeySecret
               }
+              razorpayWebhookSet={!!tenantRow.razorpayWebhookSecret}
               stripePublishableKey={tenantRow.stripePublishableKey}
               stripeConnected={
                 !!tenantRow.stripePublishableKey && !!tenantRow.stripeSecretKey
               }
+              stripeWebhookSet={!!tenantRow.stripeWebhookSecret}
             />
           </CardContent>
         </Card>

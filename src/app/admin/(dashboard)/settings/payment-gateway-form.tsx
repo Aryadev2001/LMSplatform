@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Loader2, CheckCircle2, ShieldCheck, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
   disconnectRazorpay,
   connectStripe,
   disconnectStripe,
+  saveWebhookSecret,
 } from "./actions";
 
 type Provider = "razorpay" | "stripe";
@@ -21,18 +22,115 @@ function mask(v: string) {
   return v.length <= 12 ? v : `${v.slice(0, 12)}…${v.slice(-4)}`;
 }
 
+function WebhookConfig({
+  provider,
+  tenantId,
+  configured,
+  pending,
+  onSave,
+}: {
+  provider: Provider;
+  tenantId: string | null;
+  configured: boolean;
+  pending: boolean;
+  onSave: (secret: string) => void;
+}) {
+  const [secret, setSecret] = useState("");
+  const [copied, setCopied] = useState(false);
+  const url =
+    tenantId && typeof window !== "undefined"
+      ? `${window.location.origin}/api/webhooks/${provider}/${tenantId}`
+      : "";
+
+  return (
+    <div className="space-y-3 rounded-xl border border-black/5 p-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium">
+          Webhook (recommended for reliable payment confirmation)
+        </Label>
+        {configured ? (
+          <Badge variant="secondary" className="text-[10px] text-emerald-700">
+            configured
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-[10px]">
+            not set
+          </Badge>
+        )}
+      </div>
+      <div className="space-y-1">
+        <span className="text-[11px] text-muted-foreground">
+          Add this URL in your{" "}
+          {provider === "stripe" ? "Stripe" : "Razorpay"} dashboard webhooks:
+        </span>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 truncate rounded-lg bg-secondary/60 px-2 py-1.5 text-[11px]">
+            {url || "—"}
+          </code>
+          <button
+            type="button"
+            disabled={!url}
+            onClick={() => {
+              navigator.clipboard.writeText(url).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-40"
+            aria-label="Copy URL"
+          >
+            {copied ? (
+              <Check className="size-3.5 text-emerald-600" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
+          </button>
+        </div>
+      </div>
+      <Input
+        type="password"
+        value={secret}
+        onChange={(e) => setSecret(e.target.value)}
+        placeholder={
+          configured ? "Enter a new secret to replace" : "Signing secret"
+        }
+        className="h-9 rounded-xl font-mono text-xs"
+        autoComplete="off"
+      />
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || secret.trim().length < 6}
+          onClick={() => onSave(secret.trim())}
+          className="rounded-xl"
+        >
+          {pending && <Loader2 className="size-3.5 animate-spin" />}
+          Save webhook secret
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function PaymentGatewayForm({
+  tenantId,
   provider,
   razorpayKeyId,
   razorpayConnected,
+  razorpayWebhookSet,
   stripePublishableKey,
   stripeConnected,
+  stripeWebhookSet,
 }: {
+  tenantId: string | null;
   provider: string | null;
   razorpayKeyId: string | null;
   razorpayConnected: boolean;
+  razorpayWebhookSet: boolean;
   stripePublishableKey: string | null;
   stripeConnected: boolean;
+  stripeWebhookSet: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -58,6 +156,18 @@ export function PaymentGatewayForm({
         setRzpSecret("");
         setStKey("");
         setStSecret("");
+        router.refresh();
+      } else {
+        toast.error(r.error ?? "Failed");
+      }
+    });
+  }
+
+  function saveWh(p: Provider, secret: string) {
+    startTransition(async () => {
+      const r = await saveWebhookSecret({ provider: p, secret });
+      if (r.success) {
+        toast.success("Webhook secret saved");
         router.refresh();
       } else {
         toast.error(r.error ?? "Failed");
@@ -120,6 +230,13 @@ export function PaymentGatewayForm({
                 Disconnect
               </Button>
             </div>
+            <WebhookConfig
+              provider="razorpay"
+              tenantId={tenantId}
+              configured={razorpayWebhookSet}
+              pending={pending}
+              onSave={(s) => saveWh("razorpay", s)}
+            />
           </div>
         ) : (
           <div className="space-y-4">
@@ -196,6 +313,13 @@ export function PaymentGatewayForm({
               Disconnect
             </Button>
           </div>
+          <WebhookConfig
+            provider="stripe"
+            tenantId={tenantId}
+            configured={stripeWebhookSet}
+            pending={pending}
+            onSave={(s) => saveWh("stripe", s)}
+          />
         </div>
       ) : (
         <div className="space-y-4">

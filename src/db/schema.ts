@@ -174,6 +174,10 @@ export const tenants = pgTable(
     razorpayKeySecret: text("razorpay_key_secret"),
     stripePublishableKey: varchar("stripe_publishable_key", { length: 128 }),
     stripeSecretKey: text("stripe_secret_key"),
+    // Webhook signing secrets (encrypted at rest, like the gateway keys).
+    // Nullable — webhooks are optional hardening on top of return-verify.
+    razorpayWebhookSecret: text("razorpay_webhook_secret"),
+    stripeWebhookSecret: text("stripe_webhook_secret"),
     paymentProvider: varchar("payment_provider", { length: 16 }),
     // Referral config
     referralPointsPercent: doublePrecision("referral_points_percent")

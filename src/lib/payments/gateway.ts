@@ -47,6 +47,30 @@ export async function resolveTenantGateway(
   return { provider: "none" };
 }
 
+/** Decrypted webhook signing secret for a tenant+provider, or null if the
+ *  tenant hasn't configured one (webhooks then simply aren't active). */
+export async function getTenantWebhookSecret(
+  tenantId: string,
+  provider: "stripe" | "razorpay",
+): Promise<string | null> {
+  const [t] = await db
+    .select({
+      stripe: tenants.stripeWebhookSecret,
+      razorpay: tenants.razorpayWebhookSecret,
+    })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!t) return null;
+  const enc = provider === "stripe" ? t.stripe : t.razorpay;
+  if (!enc) return null;
+  try {
+    return decryptSecret(enc);
+  } catch {
+    return null;
+  }
+}
+
 export type ChargeInit =
   | {
       provider: "razorpay";
