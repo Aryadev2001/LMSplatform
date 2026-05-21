@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { BrandMark } from "@/components/brand";
+import { EuroLogo } from "@/components/euro/euro-logo";
 import { NAV_ITEMS, ROLE_LABELS, type DashRole } from "./nav-items";
 import type { TenantBrand } from "./dashboard-shell";
 
@@ -26,7 +27,11 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ role, brand }: DashboardSidebarProps) {
   const items = NAV_ITEMS[role];
   const roleLabel = ROLE_LABELS[role];
-  const brandName = brand?.name ?? "EDT";
+  const brandName = brand?.name ?? "eurodigital.coach";
+  // Show the eurodigital wordmark when we're branded as the platform itself
+  // (default tenant / super-admin / unbranded admin). Real tenants get their
+  // own logoUrl-or-BrandMark + name below.
+  const isPlatform = !brand?.logoUrl && brandName === "eurodigital.coach";
   const pathname = usePathname();
   const isActiveLink = (href: string) => {
     if (pathname === href) return true;
@@ -38,24 +43,33 @@ export function DashboardSidebar({ role, brand }: DashboardSidebarProps) {
   return (
     <Sidebar collapsible="icon" className="border-r border-black/5">
       <SidebarHeader>
-        <div className="flex items-center gap-3 px-2 py-4">
-          {brand?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={brand.logoUrl}
-              alt={brandName}
-              className="size-12 shrink-0 rounded-lg object-contain"
-            />
-          ) : (
-            <BrandMark className="size-12 shrink-0 text-foreground" />
-          )}
-          <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-base font-bold tracking-tight">{brandName}</span>
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+        {isPlatform ? (
+          <div className="flex flex-col gap-1 px-2 py-4">
+            <EuroLogo className="text-xl" />
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground group-data-[collapsible=icon]:hidden">
               {roleLabel}
             </span>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-3 px-2 py-4">
+            {brand?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={brand.logoUrl}
+                alt={brandName}
+                className="size-12 shrink-0 rounded-lg object-contain"
+              />
+            ) : (
+              <BrandMark className="size-12 shrink-0 text-foreground" />
+            )}
+            <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate text-base font-bold tracking-tight">{brandName}</span>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {roleLabel}
+              </span>
+            </div>
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent className="px-1">

@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <DashboardShell
         role="admin"
         title="Admin"
-        brand={{ name: tenant?.name ?? "EDT", logoUrl: tenant?.logoUrl ?? null }}
+        brand={{ name: tenant?.name ?? "eurodigital.coach", logoUrl: tenant?.logoUrl ?? null }}
       >
         {children}
       </DashboardShell>

@@ -36,8 +36,6 @@ export function BrandMark({ className }: BrandMarkProps) {
 interface BrandProps {
   className?: string;
   wordmarkClassName?: string;
-  /** show the full legal name instead of the short wordmark */
-  full?: boolean;
   /** tenant logo — when set, replaces the mark+wordmark with the image */
   logoUrl?: string | null;
   /** tenant display name (logo alt + wordmark when whitelabeled) */
@@ -47,7 +45,6 @@ interface BrandProps {
 export function Brand({
   className,
   wordmarkClassName,
-  full = false,
   logoUrl,
   name,
 }: BrandProps) {
@@ -62,7 +59,7 @@ export function Brand({
     );
   }
 
-  const label = name ?? (full ? "Euro Digital Technologies" : "EDT");
+  const label = name ?? "eurodigital.coach";
   return (
     <div className={cn("inline-flex items-center gap-2 text-foreground", className)}>
       <BrandMark />
