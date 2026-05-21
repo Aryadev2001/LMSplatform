@@ -22,6 +22,39 @@ function mask(v: string) {
   return v.length <= 12 ? v : `${v.slice(0, 12)}…${v.slice(-4)}`;
 }
 
+function TabBtn({
+  id,
+  label,
+  active,
+  isActiveProvider,
+  onSelect,
+}: {
+  id: Provider;
+  label: string;
+  active: boolean;
+  isActiveProvider: boolean;
+  onSelect: (id: Provider) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(id)}
+      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+        active
+          ? "bg-foreground text-background"
+          : "bg-secondary/60 text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {label}
+      {isActiveProvider && (
+        <span className="ml-1.5 rounded bg-emerald-500/20 px-1 text-[10px] text-emerald-700">
+          active
+        </span>
+      )}
+    </button>
+  );
+}
+
 function WebhookConfig({
   provider,
   tenantId,
@@ -175,30 +208,23 @@ export function PaymentGatewayForm({
     });
   }
 
-  const TabBtn = ({ id, label }: { id: Provider; label: string }) => (
-    <button
-      type="button"
-      onClick={() => setTab(id)}
-      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-        tab === id
-          ? "bg-foreground text-background"
-          : "bg-secondary/60 text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {label}
-      {provider === id && (
-        <span className="ml-1.5 rounded bg-emerald-500/20 px-1 text-[10px] text-emerald-700">
-          active
-        </span>
-      )}
-    </button>
-  );
-
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <TabBtn id="razorpay" label="Razorpay" />
-        <TabBtn id="stripe" label="Stripe" />
+        <TabBtn
+          id="razorpay"
+          label="Razorpay"
+          active={tab === "razorpay"}
+          isActiveProvider={provider === "razorpay"}
+          onSelect={setTab}
+        />
+        <TabBtn
+          id="stripe"
+          label="Stripe"
+          active={tab === "stripe"}
+          isActiveProvider={provider === "stripe"}
+          onSelect={setTab}
+        />
       </div>
 
       {tab === "razorpay" ? (
