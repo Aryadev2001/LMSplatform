@@ -205,8 +205,30 @@ const resolveCurrentUser = async (): Promise<CurrentUser | null> => {
         ? CANONICAL_STUDENT
         : (rawMeta as RawRole);
     const isSuper = SUPER_ROLES.includes(canonical);
-    const tenantId =
-      !isSuper && typeof pub.tenantId === "string" ? pub.tenantId : null;
+    // Tenant resolution:
+    //   - Super roles: tenant-less by design.
+    //   - Invited admin/student: invitation publicMetadata carries tenantId.
+    //   - Self-serve learner (Clerk SignUp with unsafeMetadata.role='student'):
+    //     no tenantId in metadata, so we attach them to the platform's
+    //     DEFAULT tenant (DEFAULT_TENANT_SLUG, normally "edt"). This is the
+    //     marketplace-default home for cross-tenant learners and lines up
+    //     with what tenant.ts treats as the apex / fallback tenant.
+    let tenantId: string | null = null;
+    if (!isSuper) {
+      if (typeof pub.tenantId === "string") {
+        tenantId = pub.tenantId;
+      } else if (canonical === CANONICAL_STUDENT) {
+        const { tenants: tenantsTable } = await import("@/db/schema");
+        const defaultSlug =
+          process.env.DEFAULT_TENANT_SLUG ?? "edt";
+        const [t] = await db
+          .select({ id: tenantsTable.id })
+          .from(tenantsTable)
+          .where(eq(tenantsTable.slug, defaultSlug))
+          .limit(1);
+        tenantId = t?.id ?? null;
+      }
+    }
 
     try {
       await db.insert(users).values({

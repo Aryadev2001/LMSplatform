@@ -1,6 +1,17 @@
 import Link from "next/link";
-import { BookOpen, GraduationCap, Award, Coins, ArrowRight } from "lucide-react";
-import { requireRole } from "@/lib/auth";
+import { eq } from "drizzle-orm";
+import {
+  BookOpen,
+  GraduationCap,
+  Award,
+  Coins,
+  ArrowRight,
+  UserSquare2,
+  CheckCircle2,
+} from "lucide-react";
+import { requireRole, getCurrentUser } from "@/lib/auth";
+import { db } from "@/db/client";
+import { students, users } from "@/db/schema";
 import { getStudentSnapshot } from "@/lib/student";
 import { AI_SERVICES, formatAiPrice } from "@/lib/ai-services";
 
@@ -17,6 +28,26 @@ export default async function StudentDashboard() {
   const auth = await requireRole("student");
   const snap = await getStudentSnapshot(auth.userId);
   if (!snap) return null;
+
+  // Profile-completion gate banner — when students.profile_completed_at is
+  // null we nudge the learner to /student/profile (and block paid checkout
+  // downstream when the gate ships).
+  const me = await getCurrentUser();
+  const [meRow] = me
+    ? await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, me.userId))
+        .limit(1)
+    : [];
+  const [stRow] = meRow
+    ? await db
+        .select({ profileCompletedAt: students.profileCompletedAt })
+        .from(students)
+        .where(eq(students.userId, meRow.id))
+        .limit(1)
+    : [];
+  const profileComplete = !!stRow?.profileCompletedAt;
 
   const c = snap.counts;
   const stats = [
@@ -61,6 +92,54 @@ export default async function StudentDashboard() {
           </span>
         </h1>
       </div>
+
+      {!profileComplete && (
+        <div
+          className="flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between"
+          style={{
+            borderColor: "rgba(0,174,239,0.30)",
+            background: "rgba(0,174,239,0.08)",
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: "var(--ed-blue)" }}
+            >
+              <UserSquare2 className="size-4 text-white" />
+            </span>
+            <div>
+              <div
+                className="text-sm font-bold"
+                style={{ color: "var(--ed-ink)" }}
+              >
+                Complete your profile
+              </div>
+              <div
+                className="mt-0.5 text-xs"
+                style={{ color: "var(--ed-ink-2)" }}
+              >
+                We need a few details (mobile, T&amp;C consent, optional
+                professional info) before you can enrol in a paid course.
+                Takes about a minute.
+              </div>
+            </div>
+          </div>
+          <Link
+            href="/student/profile"
+            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90"
+            style={{ background: "var(--ed-gradient)" }}
+          >
+            Complete profile
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      )}
+      {profileComplete && (
+        <div className="hidden">
+          <CheckCircle2 className="size-3.5" />
+        </div>
+      )}
 
       {/* Stat cards — all real */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

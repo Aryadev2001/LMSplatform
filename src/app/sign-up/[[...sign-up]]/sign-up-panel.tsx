@@ -114,15 +114,31 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
 
       <div className="mt-6">
         {role === "learner" ? (
-          <div className="euro-clerk">
-            <SignUp
-              appearance={clerkAppearance}
-              routing="path"
-              path="/sign-up"
-              signInUrl="/sign-in"
-              forceRedirectUrl="/post-login"
-              fallbackRedirectUrl="/post-login"
-            />
+          <div>
+            <div
+              className="mb-5 rounded-xl border px-4 py-3 text-[12px]"
+              style={{
+                borderColor: "var(--ed-line)",
+                background: "rgba(141,198,63,0.08)",
+                color: "var(--ed-ink-2)",
+              }}
+            >
+              You&apos;re signing up as a <strong>Learner</strong>. After
+              your magic-link verifies you&apos;ll complete a short profile
+              (mobile, T&amp;C consent, optional professional info) before
+              you can enrol in a paid course.
+            </div>
+            <div className="euro-clerk">
+              <SignUp
+                appearance={clerkAppearance}
+                routing="path"
+                path="/sign-up"
+                signInUrl="/sign-in"
+                forceRedirectUrl="/post-login"
+                fallbackRedirectUrl="/post-login"
+                unsafeMetadata={{ role: "student" }}
+              />
+            </div>
           </div>
         ) : (
           <div>
