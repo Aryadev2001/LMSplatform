@@ -1,4 +1,17 @@
-import { and, desc, eq, ilike, isNotNull, or, sql, ne } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  or,
+  sql,
+  ne,
+  gte,
+  lte,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "@/db/client";
 import { tenants, programs, users } from "@/db/schema";
 
@@ -64,17 +77,90 @@ export async function getMarketStats(): Promise<{
   };
 }
 
+export type CourseLevel = "low" | "mid" | "high";
+export type CoursePriceBucket = "free" | "paid" | "under50" | "50_200";
+export type CourseDurationBucket = "0_3" | "3_6" | "6_12" | "12_plus";
+
+export interface CourseFilters {
+  q?: string;
+  /** Tier maps to Beginner=low / Intermediate=mid / Advanced=high. */
+  levels?: CourseLevel[];
+  /** Free / Paid / Under $50 / $50-$200. Price filter is INR-paise normalised
+   *  via simple thresholds (we use cents as the underlying unit). */
+  prices?: CoursePriceBucket[];
+  /** Duration buckets in MONTHS — we store durationMonths, not hours. */
+  durations?: CourseDurationBucket[];
+}
+
+// Match thresholds expressed in *cents* (priceCents). $50 = 5000, $200 = 20000.
+const PRICE_UNDER_50 = 5000;
+const PRICE_50_200_MIN = 5000;
+const PRICE_50_200_MAX = 20000;
+
 export async function getMarketCourses(opts?: {
   q?: string;
   limit?: number;
-}): Promise<MarketCourse[]> {
+} & Pick<CourseFilters, "levels" | "prices" | "durations">): Promise<MarketCourse[]> {
   const q = opts?.q?.trim();
-  const where = q
-    ? and(
-        liveCourseWhere,
-        or(ilike(programs.name, `%${q}%`), ilike(programs.tagline, `%${q}%`)),
-      )
-    : liveCourseWhere;
+  const conditions: (SQL | undefined)[] = [liveCourseWhere];
+
+  if (q) {
+    conditions.push(
+      or(ilike(programs.name, `%${q}%`), ilike(programs.tagline, `%${q}%`)),
+    );
+  }
+
+  if (opts?.levels && opts.levels.length > 0) {
+    conditions.push(inArray(programs.tier, opts.levels));
+  }
+
+  if (opts?.prices && opts.prices.length > 0) {
+    const priceOrs: SQL[] = [];
+    for (const p of opts.prices) {
+      if (p === "free") priceOrs.push(eq(programs.priceCents, 0));
+      else if (p === "paid") priceOrs.push(sql`${programs.priceCents} > 0`);
+      else if (p === "under50")
+        priceOrs.push(
+          and(
+            sql`${programs.priceCents} > 0`,
+            lte(programs.priceCents, PRICE_UNDER_50),
+          )!,
+        );
+      else if (p === "50_200")
+        priceOrs.push(
+          and(
+            gte(programs.priceCents, PRICE_50_200_MIN),
+            lte(programs.priceCents, PRICE_50_200_MAX),
+          )!,
+        );
+    }
+    if (priceOrs.length) conditions.push(or(...priceOrs));
+  }
+
+  if (opts?.durations && opts.durations.length > 0) {
+    const dOrs: SQL[] = [];
+    for (const d of opts.durations) {
+      if (d === "0_3") dOrs.push(lte(programs.durationMonths, 3));
+      else if (d === "3_6")
+        dOrs.push(
+          and(
+            gte(programs.durationMonths, 4),
+            lte(programs.durationMonths, 6),
+          )!,
+        );
+      else if (d === "6_12")
+        dOrs.push(
+          and(
+            gte(programs.durationMonths, 7),
+            lte(programs.durationMonths, 12),
+          )!,
+        );
+      else if (d === "12_plus") dOrs.push(gte(programs.durationMonths, 13));
+    }
+    if (dOrs.length) conditions.push(or(...dOrs));
+  }
+
+  const where = and(...conditions.filter((c): c is SQL => Boolean(c)));
 
   const rows = await db
     .select({

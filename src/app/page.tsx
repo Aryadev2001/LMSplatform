@@ -3,7 +3,7 @@ import { ArrowRight, Star } from "lucide-react";
 import { EuroNav, EURO_CATEGORIES } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { EuroCourseCard } from "@/components/euro/course-card";
-import { ProgressiveHero } from "@/components/ui/progressive-hero";
+import { FloatingHero } from "@/components/euro/floating-hero";
 import {
   getMarketStats,
   getMarketCourses,
@@ -35,10 +35,10 @@ export default async function HomePage() {
   ]);
 
   const statTiles = [
-    { value: `${stats.courses}`, label: "COURSES" },
-    { value: `${stats.institutes}`, label: "INSTITUTES" },
-    { value: `${stats.learners}`, label: "LEARNERS" },
-    { value: "4.8★", label: "AVG RATING" },
+    { value: `${stats.courses}+`, label: "COURSES" },
+    { value: `${stats.institutes}+`, label: "PARTNER INSTITUTES" },
+    { value: `${stats.learners}+`, label: "ACTIVE LEARNERS" },
+    { value: "4.8★", label: "AVG. RATING" },
   ];
 
   return (
@@ -46,7 +46,11 @@ export default async function HomePage() {
       <EuroNav />
 
       {/* Hero */}
-      <ProgressiveHero institutes={stats.institutes} statTiles={statTiles} />
+      <FloatingHero
+        institutes={stats.institutes}
+        statTiles={statTiles}
+        featuredCourses={trending.slice(0, 3)}
+      />
 
       {/* Categories */}
       <section className="mx-auto max-w-7xl px-6 py-14">
