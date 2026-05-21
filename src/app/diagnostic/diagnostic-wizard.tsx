@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
@@ -48,40 +48,77 @@ const EMPTY_FIRMO: Firmo = {
   yearsInBusiness: "",
 };
 
+// localStorage is the source of truth for the draft (one place, no
+// setState-in-effect). useSyncExternalStore reads it; every user input
+// writes through and broadcasts a change event so all consumers re-render.
+interface Draft {
+  answers: Answers;
+  firmo: Firmo;
+}
+const EMPTY_DRAFT: Draft = { answers: {}, firmo: EMPTY_FIRMO };
+let cachedRaw: string | null = null;
+let cachedDraft: Draft = EMPTY_DRAFT;
+
+function readDraft(): Draft {
+  if (typeof window === "undefined") return EMPTY_DRAFT;
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    /* private mode */
+  }
+  if (raw === cachedRaw) return cachedDraft;
+  cachedRaw = raw;
+  try {
+    if (raw) {
+      const d = JSON.parse(raw) as Partial<Draft>;
+      cachedDraft = {
+        answers: d.answers ?? {},
+        firmo: { ...EMPTY_FIRMO, ...(d.firmo ?? {}) },
+      };
+    } else {
+      cachedDraft = EMPTY_DRAFT;
+    }
+  } catch {
+    cachedDraft = EMPTY_DRAFT;
+  }
+  return cachedDraft;
+}
+
+function writeDraft(next: Draft) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event("ed-diag-changed"));
+}
+
+function subscribeDraft(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("ed-diag-changed", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("ed-diag-changed", cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function getServerDraft(): Draft {
+  return EMPTY_DRAFT;
+}
+
 export function DiagnosticWizard() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Answers>({});
-  const [firmo, setFirmo] = useState<Firmo>(EMPTY_FIRMO);
-  const [hydrated, setHydrated] = useState(false);
-
-  // Restore draft
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        if (d.answers) setAnswers(d.answers);
-        if (d.firmo) setFirmo({ ...EMPTY_FIRMO, ...d.firmo });
-      }
-    } catch {
-      /* ignore */
-    }
-    setHydrated(true);
-  }, []);
-
-  // Autosave
-  useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers, firmo }));
-  }, [answers, firmo, hydrated]);
+  const draft = useSyncExternalStore(subscribeDraft, readDraft, getServerDraft);
+  const { answers, firmo } = draft;
 
   const isFirmoStep = step === LAYERS.length;
   const progress = Math.round((step / TOTAL_STEPS) * 100);
 
   function setAnswer(qid: string, value: number) {
-    setAnswers((a) => ({ ...a, [qid]: value }));
+    writeDraft({ ...draft, answers: { ...answers, [qid]: value } });
+  }
+  function setFirmo(next: Firmo) {
+    writeDraft({ ...draft, firmo: next });
   }
 
   const currentLayer = LAYERS[step];
@@ -127,10 +164,6 @@ export function DiagnosticWizard() {
         toast.error(r.error);
       }
     });
-  }
-
-  if (!hydrated) {
-    return <div className="h-64 animate-pulse rounded-2xl bg-secondary/40" />;
   }
 
   return (
