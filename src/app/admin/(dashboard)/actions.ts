@@ -55,6 +55,18 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
       tenantId,
     })
     .returning({ id: programs.id });
+  await recordAudit({
+    action: "program.create",
+    targetType: "program",
+    targetId: row.id,
+    metadata: {
+      tenantId,
+      name: parsed.data.name,
+      priceCents: parsed.data.priceCents,
+      free: parsed.data.priceCents === 0,
+      currency: parsed.data.currency,
+    },
+  });
   await autoSyncPlan(tenantId, row.id);
   revalidatePath("/admin/programs");
   return { success: true, id: row.id };
@@ -83,6 +95,18 @@ export async function updateProgram(
       updatedAt: new Date(),
     })
     .where(and(eq(programs.id, id), eq(programs.tenantId, tenantId)));
+  await recordAudit({
+    action: "program.update",
+    targetType: "program",
+    targetId: id,
+    metadata: {
+      tenantId,
+      name: parsed.data.name,
+      priceCents: parsed.data.priceCents,
+      free: parsed.data.priceCents === 0,
+      currency: parsed.data.currency,
+    },
+  });
   await autoSyncPlan(tenantId, id);
   revalidatePath("/admin/programs");
   return { success: true, id };
@@ -112,6 +136,12 @@ export async function toggleProgramActive(id: string, isActive: boolean) {
     .update(programs)
     .set({ isActive, updatedAt: new Date() })
     .where(and(eq(programs.id, id), eq(programs.tenantId, tenantId)));
+  await recordAudit({
+    action: isActive ? "program.activate" : "program.deactivate",
+    targetType: "program",
+    targetId: id,
+    metadata: { tenantId, isActive },
+  });
   revalidatePath("/admin/programs");
   return { success: true as const };
 }

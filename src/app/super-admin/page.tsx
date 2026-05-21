@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { sql, eq, and, desc, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { tenants, users, programs, payments, orders } from "@/db/schema";
@@ -92,6 +93,7 @@ export default async function SuperAdminOverviewPage() {
         status: programs.status,
         createdAt: programs.createdAt,
         tenant: tenants.name,
+        tenantId: tenants.id,
       })
       .from(programs)
       .leftJoin(tenants, eq(programs.tenantId, tenants.id))
@@ -274,7 +276,16 @@ export default async function SuperAdminOverviewPage() {
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {c.tenant ?? "—"}
+                      {c.tenantId ? (
+                        <Link
+                          href={`/super-admin/tenants/${c.tenantId}`}
+                          className="hover:text-foreground hover:underline"
+                        >
+                          {c.tenant ?? "—"}
+                        </Link>
+                      ) : (
+                        (c.tenant ?? "—")
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{c.status}</Badge>
