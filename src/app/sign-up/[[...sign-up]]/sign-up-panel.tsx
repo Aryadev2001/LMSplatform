@@ -19,15 +19,15 @@ const ROLES = [
     icon: GraduationCap,
   },
   {
-    id: "creator",
-    label: "Creator",
-    sub: "Publish your own free courses",
+    id: "basic_partner",
+    label: "Partner — Basic",
+    sub: "Publish free courses (upgrade later)",
     icon: Building2,
   },
 ] as const;
 
 export function SignUpPanel({ refCode }: { refCode: string | null }) {
-  const [role, setRole] = useState<"learner" | "creator">("learner");
+  const [role, setRole] = useState<"learner" | "basic_partner">("learner");
 
   return (
     <div>
@@ -134,17 +134,16 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
                 color: "var(--ed-ink-2)",
               }}
             >
-              You&apos;re signing up as a <strong>Creator</strong>. You&apos;ll
-              get a personal page where you can publish <strong>free</strong>{" "}
-              courses to the marketplace. Paid courses are available via the
-              partner program —{" "}
+              You&apos;re signing up as a <strong>Basic Partner</strong>{" "}
+              (free). You&apos;ll get a personal page where you can publish{" "}
+              <strong>free</strong> courses to the marketplace. Upgrade to{" "}
               <Link
-                href="/contact"
+                href="/partner-program"
                 className="font-semibold underline underline-offset-2"
               >
-                apply here
-              </Link>
-              .
+                Standard or Premium
+              </Link>{" "}
+              to publish paid courses and unlock advanced features.
             </div>
             <div className="euro-clerk">
               <SignUp
@@ -154,7 +153,7 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
                 signInUrl="/sign-in"
                 forceRedirectUrl="/post-login"
                 fallbackRedirectUrl="/post-login"
-                unsafeMetadata={{ role: "creator" }}
+                unsafeMetadata={{ role: "basic_partner" }}
               />
             </div>
           </div>

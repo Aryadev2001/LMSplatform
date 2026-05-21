@@ -117,6 +117,28 @@ export const courseStatusEnum = pgEnum("course_status", [
   "archived",
 ]);
 
+// ---------- Partner tier program (3-tier self-serve, 0012) ----------
+export const partnerTierEnum = pgEnum("partner_tier", [
+  "basic",
+  "standard",
+  "premium",
+]);
+export const partnerBillingStatusEnum = pgEnum("partner_billing_status", [
+  "none",
+  "active",
+  "trialing",
+  "past_due",
+  "canceled",
+]);
+
+// ---------- Course extensions (0013) ----------
+export const courseLanguageEnum = pgEnum("course_language", ["en", "ar", "hi"]);
+export const offerTypeEnum = pgEnum("offer_type", [
+  "reward_points",
+  "reward_percentage",
+  "voucher_code",
+]);
+
 // ---------- Phase 2: Payments / cart ----------
 export const cartStatusEnum = pgEnum("cart_status", [
   "open",
@@ -192,10 +214,44 @@ export const tenants = pgTable(
     // (1500 = 15%); the institute's payout is the remainder. Super-admin
     // managed; institutes cannot change their own rate.
     platformFeeBps: integer("platform_fee_bps").notNull().default(1500),
-    // Self-serve creator tier: anyone can sign up as Creator, gets a
-    // personal tenant flagged creatorOnly=true, can only publish FREE
-    // courses. Real partners (invite-only) stay creatorOnly=false.
+    // Self-serve creator tier: legacy boolean kept for backwards-compat.
+    // Going forward, use `tier` ('basic' | 'standard' | 'premium').
     creatorOnly: boolean("creator_only").notNull().default(false),
+    // ---- Partner tier program (0012) ----
+    tier: partnerTierEnum("tier").notNull().default("basic"),
+    billingStatus: partnerBillingStatusEnum("billing_status")
+      .notNull()
+      .default("none"),
+    platformStripeCustomerId: varchar("platform_stripe_customer_id", {
+      length: 128,
+    }),
+    platformStripeSubscriptionId: varchar("platform_stripe_subscription_id", {
+      length: 128,
+    }),
+    platformCurrentPeriodEnd: timestamp("platform_current_period_end", {
+      withTimezone: true,
+    }),
+    // ---- Business registration (0012) ----
+    businessLegalName: varchar("business_legal_name", { length: 240 }),
+    businessRegNumber: varchar("business_reg_number", { length: 120 }),
+    businessRegDocUrl: text("business_reg_doc_url"),
+    businessAddressLine1: varchar("business_address_line1", { length: 240 }),
+    businessAddressLine2: varchar("business_address_line2", { length: 240 }),
+    businessCity: varchar("business_city", { length: 120 }),
+    businessState: varchar("business_state", { length: 120 }),
+    businessPostalCode: varchar("business_postal_code", { length: 40 }),
+    businessCountry: varchar("business_country", { length: 2 }),
+    businessPhone: varchar("business_phone", { length: 40 }),
+    businessFinancialInfo: jsonb("business_financial_info"),
+    // ---- Branding extras (0012) ----
+    companyProfile: text("company_profile"),
+    companySocials: jsonb("company_socials"),
+    // ---- Owner / primary contact (0012) ----
+    ownerName: varchar("owner_name", { length: 200 }),
+    ownerTitle: varchar("owner_title", { length: 120 }),
+    ownerPhotoUrl: text("owner_photo_url"),
+    ownerProfile: text("owner_profile"),
+    ownerSocials: jsonb("owner_socials"),
     // Lifecycle
     status: tenantStatusEnum("status").notNull().default("ACTIVE"),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
@@ -287,6 +343,15 @@ export const programs = pgTable(
       { onDelete: "set null" },
     ),
     tierUnlockEligible: boolean("tier_unlock_eligible").notNull().default(false),
+    // ---- 0013 course extensions ----
+    language: courseLanguageEnum("language").notNull().default("en"),
+    features: jsonb("features").notNull().default(sql`'[]'::jsonb`),
+    introVideoUrl: text("intro_video_url"),
+    workshopVideoUrl: text("workshop_video_url"),
+    totalDurationHours: integer("total_duration_hours").notNull().default(0),
+    disclaimer: text("disclaimer"),
+    termsHtml: text("terms_html"),
+    certificateTemplateUrl: text("certificate_template_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -308,6 +373,9 @@ export const modules = pgTable(
     title: varchar("title", { length: 240 }).notNull(),
     description: text("description"),
     orderIndex: integer("order_index").notNull().default(0),
+    // ---- 0013 ----
+    durationMinutes: integer("duration_minutes").notNull().default(0),
+    introVideoUrl: text("intro_video_url"),
   },
   (t) => [index("modules_course_idx").on(t.courseId)],
 );
@@ -345,6 +413,88 @@ export const lessonProgress = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("lesson_progress_unique").on(t.userId, t.lessonId)],
+);
+
+// ---------- Exams (0013) ----------
+export const exams = pgTable(
+  "exams",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    moduleId: uuid("module_id").references(() => modules.id, {
+      onDelete: "cascade",
+    }),
+    title: varchar("title", { length: 240 }).notNull(),
+    durationMinutes: integer("duration_minutes").notNull().default(30),
+    totalMarks: integer("total_marks").notNull().default(0),
+    passingMarks: integer("passing_marks").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("exams_program_idx").on(t.programId),
+    index("exams_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const examQuestions = pgTable(
+  "exam_questions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    examId: uuid("exam_id")
+      .notNull()
+      .references(() => exams.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    question: text("question").notNull(),
+    options: jsonb("options").notNull(),
+    marks: integer("marks").notNull().default(1),
+    orderIndex: integer("order_index").notNull().default(0),
+  },
+  (t) => [
+    index("exam_questions_exam_idx").on(t.examId),
+    index("exam_questions_tenant_idx").on(t.tenantId),
+  ],
+);
+
+// ---------- Course offers / vouchers (0013) ----------
+export const courseOffers = pgTable(
+  "course_offers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    type: offerTypeEnum("type").notNull(),
+    valueInt: integer("value_int").notNull().default(0),
+    voucherCode: varchar("voucher_code", { length: 40 }),
+    maxRedemptions: integer("max_redemptions"),
+    redemptionsUsed: integer("redemptions_used").notNull().default(0),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("course_offers_program_idx").on(t.programId),
+    index("course_offers_tenant_idx").on(t.tenantId),
+  ],
 );
 
 // ---------- Coaches (1:1 with users) ----------

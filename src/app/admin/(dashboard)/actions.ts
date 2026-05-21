@@ -35,23 +35,23 @@ const ProgramSchema = z.object({
 
 export type ProgramResult = { success: true; id: string } | { success: false; error: string };
 
-/** Creator-tier tenants (self-serve signups) can only publish FREE courses;
- *  paid courses require the invite-only partner program. */
+/** Basic-tier partners can only publish FREE courses. Paid courses unlock
+ *  at the Standard tier and above. */
 async function assertPriceAllowed(
   tenantId: string,
   priceCents: number,
 ): Promise<ProgramResult | null> {
   if (priceCents === 0) return null;
   const [t] = await db
-    .select({ creatorOnly: tenants.creatorOnly })
+    .select({ tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.id, tenantId))
     .limit(1);
-  if (t?.creatorOnly) {
+  if (t?.tier === "basic") {
     return {
       success: false,
       error:
-        "Paid courses require the partner program — apply at /contact. Your creator tier supports free courses only.",
+        "Paid courses are a Standard / Premium feature. Upgrade your partner plan at /admin/partner/billing — Basic supports free courses only.",
     };
   }
   return null;

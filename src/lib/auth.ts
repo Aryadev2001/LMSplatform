@@ -120,11 +120,13 @@ const resolveCurrentUser = async (): Promise<CurrentUser | null> => {
       };
     }
 
-    // Self-serve creator sign-up: auto-provision a personal tenant
-    // (creator_only=true → can only publish free courses) and become its
-    // TENANT_ADMIN. Paid courses still require the invite-only partner
-    // program (enforced in createProgram).
-    if (rawMeta.toLowerCase() === "creator") {
+    // Self-serve partner sign-up (Basic tier): auto-provision a personal
+    // tenant on the FREE tier and become its TENANT_ADMIN. Standard and
+    // Premium tiers are paid upgrades (Stripe Checkout from
+    // /admin/partner/billing). Legacy 'creator' role is treated as 'basic'
+    // for backwards-compat with sessions that signed up before the rename.
+    const lowerRole = rawMeta.toLowerCase();
+    if (lowerRole === "basic_partner" || lowerRole === "creator") {
       const makeSlug = () => `c-${Math.random().toString(36).slice(2, 10)}`;
       let tenantId: string | null = null;
       for (let i = 0; i < 3 && !tenantId; i++) {
@@ -135,6 +137,8 @@ const resolveCurrentUser = async (): Promise<CurrentUser | null> => {
               slug: makeSlug(),
               name: fullName ? `${fullName}'s page` : "My page",
               status: "ACTIVE",
+              tier: "basic",
+              // creatorOnly retained for backwards-compat reads.
               creatorOnly: true,
             })
             .returning({ id: tenants.id });

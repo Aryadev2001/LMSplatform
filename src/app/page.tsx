@@ -158,11 +158,11 @@ export default async function HomePage() {
               gateway, and start enrolling learners — no code required.
             </p>
             <Link
-              href="/contact"
+              href="/partner-program"
               className="mt-6 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold"
               style={{ background: "var(--ed-gradient)" }}
             >
-              Become a Partner <ArrowRight className="size-4" />
+              See partner plans <ArrowRight className="size-4" />
             </Link>
           </div>
         </div>
