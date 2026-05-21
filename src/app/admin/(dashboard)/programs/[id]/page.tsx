@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
-import { programs, modules, lessons } from "@/db/schema";
-import { eq, and, asc, inArray } from "drizzle-orm";
+import { programs, modules, lessons, exams, examQuestions } from "@/db/schema";
+import { eq, and, asc, inArray, desc, sql } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,16 @@ import { requireTenantId } from "@/lib/tenant";
 import { formatInr } from "@/lib/courses";
 import { ModuleDialog, DeleteModuleButton, DeleteLessonButton } from "./module-dialog";
 import { LessonDialog } from "./lesson-dialog";
-import { ArrowLeft, PlayCircle, FileText, Video } from "lucide-react";
+import { ExamDialog, DeleteExamButton } from "./exam-dialog";
+import {
+  ArrowLeft,
+  PlayCircle,
+  FileText,
+  Video,
+  ClipboardList,
+  Clock,
+  Layers,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +57,26 @@ export default async function CourseContentPage({
     allLessons.filter((l) => l.moduleId === moduleId);
 
   const totalLessons = mods.reduce((s, m) => s + lessonsByModule(m.id).length, 0);
+
+  // Exams attached to this course (any module, plus course-level).
+  const examRows = await db
+    .select({
+      id: exams.id,
+      title: exams.title,
+      moduleId: exams.moduleId,
+      durationMinutes: exams.durationMinutes,
+      totalMarks: exams.totalMarks,
+      passingMarks: exams.passingMarks,
+      isActive: exams.isActive,
+      questionCount: sql<number>`(
+        select count(*)::int from ${examQuestions} q where q.exam_id = ${exams.id}
+      )`,
+    })
+    .from(exams)
+    .where(and(eq(exams.programId, id), eq(exams.tenantId, tenantId)))
+    .orderBy(desc(exams.createdAt));
+  const moduleOptions = mods.map((m) => ({ id: m.id, title: m.title }));
+  const moduleTitleById = new Map(mods.map((m) => [m.id, m.title] as const));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -165,6 +194,106 @@ export default async function CourseContentPage({
           })}
         </div>
       )}
+
+      {/* Exams */}
+      <div>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              — Exam Q-bank
+            </div>
+            <h2 className="mt-1 text-xl font-extrabold tracking-tight">
+              Exams ({examRows.length})
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Build a question bank per module, or one course-level final exam.
+              Total marks update automatically from the questions you add.
+            </p>
+          </div>
+          <ExamDialog
+            courseId={course.id}
+            modules={moduleOptions}
+            mode="create"
+          />
+        </div>
+
+        {examRows.length === 0 ? (
+          <Card className="border-dashed bg-transparent p-10 text-center shadow-none">
+            <ClipboardList className="mx-auto size-8 text-muted-foreground" />
+            <p className="mt-3 text-sm font-medium">No exams yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Create one and start adding questions — minimum 2 options, exactly one correct.
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {examRows.map((ex) => {
+              const moduleLabel = ex.moduleId
+                ? `Module · ${moduleTitleById.get(ex.moduleId) ?? "—"}`
+                : "Course-level final";
+              return (
+                <Card
+                  key={ex.id}
+                  className="flex flex-wrap items-center justify-between gap-3 border-none bg-card p-4 shadow-card sm:flex-nowrap"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold">{ex.title}</span>
+                      {ex.isActive ? (
+                        <Badge variant="default" className="font-normal">
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="font-normal">
+                          Draft
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Layers className="size-3" /> {moduleLabel}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="size-3" /> {ex.durationMinutes} min
+                      </span>
+                      <span>
+                        <strong className="text-foreground">{ex.questionCount}</strong>{" "}
+                        question{ex.questionCount === 1 ? "" : "s"}
+                      </span>
+                      <span>
+                        <strong className="text-foreground">{ex.totalMarks}</strong> total marks
+                      </span>
+                      <span>Pass: {ex.passingMarks}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Link
+                      href={`/admin/programs/${course.id}/exams/${ex.id}`}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors hover:bg-secondary"
+                    >
+                      Manage questions
+                    </Link>
+                    <ExamDialog
+                      courseId={course.id}
+                      modules={moduleOptions}
+                      mode="edit"
+                      initial={{
+                        id: ex.id,
+                        title: ex.title,
+                        moduleId: ex.moduleId,
+                        durationMinutes: ex.durationMinutes,
+                        passingMarks: ex.passingMarks,
+                        isActive: ex.isActive,
+                      }}
+                    />
+                    <DeleteExamButton examId={ex.id} courseId={course.id} />
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <Card className="border-none bg-secondary/40 p-5 shadow-none">
         <div className="flex items-start gap-3">
