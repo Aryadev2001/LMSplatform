@@ -154,7 +154,7 @@ export default async function HomePage() {
               gateway, and start enrolling learners — no code required.
             </p>
             <Link
-              href="/partner/onboard"
+              href="/contact"
               className="mt-6 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold"
               style={{ background: "var(--ed-gradient)" }}
             >

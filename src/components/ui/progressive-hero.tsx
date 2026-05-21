@@ -160,7 +160,7 @@ export function ProgressiveHero({
             Explore courses <ArrowRight className="size-4" />
           </Link>
           <Link
-            href="/partner/onboard"
+            href="/contact"
             className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold transition-colors"
             style={{
               border: "1px solid rgba(255,255,255,0.20)",

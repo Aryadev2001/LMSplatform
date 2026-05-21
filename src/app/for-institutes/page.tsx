@@ -42,7 +42,7 @@ export default function ForInstitutesPage() {
           </>
         }
         sub="Launch a branded learning storefront with zero upfront cost. Sell paid courses on your own payment gateway, or offer free ones — your call."
-        primary={{ label: "Create your institute", href: "/partner/onboard" }}
+        primary={{ label: "Create your institute", href: "/contact" }}
         secondary={{ label: "See pricing", href: "/pricing" }}
       />
 
@@ -109,7 +109,7 @@ export default function ForInstitutesPage() {
               cost you nothing, ever.
             </p>
             <a
-              href="/partner/onboard"
+              href="/contact"
               className="relative mt-7 inline-flex items-center rounded-xl px-7 py-3 text-sm font-bold text-white"
               style={{ background: "var(--ed-gradient)" }}
             >

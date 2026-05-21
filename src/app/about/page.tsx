@@ -119,7 +119,7 @@ export default function AboutPage() {
                 Browse courses
               </a>
               <a
-                href="/partner/onboard"
+                href="/contact"
                 className="rounded-xl border px-6 py-3 text-sm font-bold"
                 style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink)" }}
               >

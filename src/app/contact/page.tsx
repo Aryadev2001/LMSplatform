@@ -19,9 +19,9 @@ const CHANNELS = [
   {
     icon: Building2,
     t: "Become a partner",
-    d: "Run your institute on eurodigital.coach — free to start.",
-    action: "Start onboarding",
-    href: "/partner/onboard",
+    d: "Partner access is invite-only. Tell us about your institute and we'll review and email your dashboard login.",
+    action: "Apply by email",
+    href: "mailto:hello@eurodigital.coach?subject=Partner%20program%20application",
   },
   {
     icon: LifeBuoy,

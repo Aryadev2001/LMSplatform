@@ -143,21 +143,21 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
               className="mt-3 text-base font-bold"
               style={{ color: "var(--ed-ink)" }}
             >
-              Onboard your institute
+              Partner access is invite-only
             </h3>
             <p
               className="mt-1 text-sm"
               style={{ color: "var(--ed-mute)" }}
             >
-              A guided 6-step setup — plan, branding, your first course, and go
-              live in about 20 minutes.
+              Tell us about your institute and we'll review and email your
+              dashboard login details.
             </p>
             <Link
-              href="/partner/onboard"
+              href="/contact"
               className="mt-5 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
               style={{ background: "var(--ed-gradient)" }}
             >
-              Start onboarding <ArrowRight className="size-4" />
+              Apply to join <ArrowRight className="size-4" />
             </Link>
             <p
               className="mt-3 text-[11px]"

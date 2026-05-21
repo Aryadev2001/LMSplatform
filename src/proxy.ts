@@ -23,7 +23,6 @@ const isPublicRoute = createRouteMatcher([
   "/cart(.*)",
   "/verify(.*)",
   "/certificate(.*)",
-  "/partner/onboard(.*)",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/accept-invite(.*)",

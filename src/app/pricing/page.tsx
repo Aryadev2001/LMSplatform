@@ -34,7 +34,7 @@ export default function PricingPage() {
           </>
         }
         sub="No upfront fee, no monthly subscription. Publish free courses at zero cost. On paid sales we take a small platform commission — that's it."
-        primary={{ label: "Start teaching free", href: "/partner/onboard" }}
+        primary={{ label: "Start teaching free", href: "/contact" }}
       />
 
       <Section>
@@ -79,7 +79,7 @@ export default function PricingPage() {
                 ))}
               </ul>
               <a
-                href="/partner/onboard"
+                href="/contact"
                 className="mt-8 inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-bold text-white"
                 style={{ background: "var(--ed-gradient)" }}
               >
