@@ -57,6 +57,7 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
   ],
   student: [
     { label: "Overview", href: "/student", icon: LayoutDashboard },
+    { label: "My Profile", href: "/student/profile", icon: UserSquare2 },
     { label: "My Courses", href: "/student/courses", icon: BookOpen },
     { label: "My Diagnostic", href: "/student/diagnostic", icon: Activity },
     { label: "AI Services", href: "/student/ai-services", icon: Sparkles },
@@ -67,6 +68,7 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
   super: [
     { label: "Overview", href: "/super-admin", icon: LayoutDashboard },
     { label: "Tenants", href: "/super-admin/tenants", icon: Building2 },
+    { label: "Students", href: "/super-admin/students", icon: GraduationCap },
     { label: "Master Courses", href: "/super-admin/courses", icon: Library },
     { label: "Payments", href: "/super-admin/payments", icon: CreditCard },
     { label: "Team", href: "/super-admin/team", icon: Users2 },

@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   jsonb,
   doublePrecision,
+  date,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -568,11 +569,57 @@ export const students = pgTable(
     }),
     goals: text("goals"),
     phone: varchar("phone", { length: 30 }),
+    // ---- 0016 extended profile ----
+    address: text("address"),
+    dateOfBirth: date("date_of_birth"),
+    personalInfo: jsonb("personal_info"),
+    professionalInfo: jsonb("professional_info"),
+    financialInfo: jsonb("financial_info"),
+    paymentModePreference: varchar("payment_mode_preference", { length: 40 }),
+    whatsappConsent: boolean("whatsapp_consent").notNull().default(false),
+    termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+    disclaimerAcceptedAt: timestamp("disclaimer_accepted_at", {
+      withTimezone: true,
+    }),
+    profileCompletedAt: timestamp("profile_completed_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("students_coach_idx").on(t.assignedCoachId),
     index("students_program_idx").on(t.assignedProgramId),
+  ],
+);
+
+// ---------- Course reviews (0016) ----------
+export const courseReviews = pgTable(
+  "course_reviews",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    enrollmentId: uuid("enrollment_id").references(() => enrollments.id, {
+      onDelete: "set null",
+    }),
+    rating: integer("rating").notNull(),
+    body: text("body"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("course_reviews_course_idx").on(t.courseId),
+    index("course_reviews_user_idx").on(t.userId),
+    index("course_reviews_tenant_idx").on(t.tenantId),
+    uniqueIndex("course_reviews_unique").on(t.courseId, t.userId),
   ],
 );
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   PlayCircle,
   FileText,
@@ -12,10 +12,15 @@ import {
   ChevronDown,
   ArrowRight,
   Building2,
-  ShieldCheck,
+  ClipboardList,
+  Globe,
+  Hourglass,
+  Sparkles,
+  Hammer,
+  MessageSquare,
 } from "lucide-react";
 import { db } from "@/db/client";
-import { tenants } from "@/db/schema";
+import { tenants, exams } from "@/db/schema";
 import { getCourseBySlug, formatRuntime } from "@/lib/courses";
 import { getRelatedCourses } from "@/lib/marketplace";
 import { formatCurrency } from "@/lib/format";
@@ -80,7 +85,31 @@ export default async function CourseDetailPage({
 
   if (!institute || institute.status === "SUSPENDED") notFound();
 
-  const related = await getRelatedCourses(tenantId, course.id, 3);
+  const [related, [examCountRow]] = await Promise.all([
+    getRelatedCourses(tenantId, course.id, 3),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(exams)
+      .where(and(eq(exams.programId, course.id), eq(exams.isActive, true))),
+  ]);
+  const examCount = examCountRow?.n ?? 0;
+
+  const FEATURE_LABEL: Record<string, { label: string; icon: typeof Award }> = {
+    certificate: { label: "Certificate of Completion", icon: Award },
+    q_bank: { label: "Q-Bank & Mock Exams", icon: ClipboardList },
+    hands_on: { label: "Hands-on Labs", icon: Hammer },
+    mentor_qa: { label: "Mentor Q&A Sessions", icon: MessageSquare },
+  };
+  const LANGUAGE_LABEL: Record<string, string> = {
+    en: "English",
+    ar: "Arabic",
+    hi: "Hindi",
+  };
+  const features = (Array.isArray(course.features)
+    ? (course.features as unknown[]).filter(
+        (f): f is string => typeof f === "string" && f in FEATURE_LABEL,
+      )
+    : []) as Array<keyof typeof FEATURE_LABEL>;
 
   const rupees = Math.floor(course.priceCents / 100);
   const referPts = Math.floor((rupees * institute.referralPct) / 100);
@@ -89,10 +118,22 @@ export default async function CourseDetailPage({
   const includes = [
     { icon: Layers, label: `${modules.length} modules` },
     { icon: PlayCircle, label: `${totalLessons} lessons` },
-    { icon: Clock, label: `${formatRuntime(totalSeconds)} of content` },
-    { icon: Award, label: "Verified certificate on completion" },
+    {
+      icon: Clock,
+      label:
+        course.totalDurationHours > 0
+          ? `${course.totalDurationHours} hours of content`
+          : `${formatRuntime(totalSeconds)} of content`,
+    },
+    examCount > 0
+      ? { icon: ClipboardList, label: `${examCount} graded exam${examCount === 1 ? "" : "s"}` }
+      : null,
+    { icon: Globe, label: `Taught in ${LANGUAGE_LABEL[course.language] ?? "English"}` },
+    course.certificateTemplateUrl
+      ? { icon: Award, label: "Verified certificate on completion" }
+      : null,
     { icon: CheckCircle2, label: "Lifetime access & updates" },
-  ];
+  ].filter((x): x is { icon: typeof Layers; label: string } => x !== null);
 
   const faqs = [
     {
@@ -188,7 +229,22 @@ export default async function CourseDetailPage({
               <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: "var(--ed-mute)" }}>
                 <span className="flex items-center gap-1.5"><Layers className="size-4" /> {modules.length} modules</span>
                 <span className="flex items-center gap-1.5"><PlayCircle className="size-4" /> {totalLessons} lessons</span>
-                <span className="flex items-center gap-1.5"><Clock className="size-4" /> {formatRuntime(totalSeconds)}</span>
+                <span className="flex items-center gap-1.5">
+                  <Hourglass className="size-4" />{" "}
+                  {course.totalDurationHours > 0
+                    ? `${course.totalDurationHours} hr`
+                    : formatRuntime(totalSeconds)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Globe className="size-4" />
+                  {LANGUAGE_LABEL[course.language] ?? "English"}
+                </span>
+                {examCount > 0 && (
+                  <span className="flex items-center gap-1.5">
+                    <ClipboardList className="size-4" />
+                    {examCount} exam{examCount === 1 ? "" : "s"}
+                  </span>
+                )}
                 <span className="flex items-center gap-1.5">{course.durationMonths} month{course.durationMonths > 1 ? "s" : ""} access</span>
               </div>
             </div>
@@ -200,11 +256,45 @@ export default async function CourseDetailPage({
                 style={{ borderColor: "var(--ed-line)" }}
               >
                 <div
-                  className="flex h-32 items-center justify-center"
+                  className="relative h-40 overflow-hidden"
                   style={{ background: "var(--ed-gradient)" }}
                 >
-                  <div className="absolute inset-x-0 h-32" style={{ background: "var(--ed-halftone)" }} />
-                  <PlayCircle className="relative size-10 text-white/90" />
+                  {course.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={course.imageUrl}
+                      alt={course.name}
+                      className="absolute inset-0 size-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: "var(--ed-halftone)" }}
+                    />
+                  )}
+                  {course.introVideoUrl ? (
+                    <a
+                      href={course.introVideoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Watch intro video"
+                      className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors hover:bg-black/40"
+                    >
+                      <span className="flex size-14 items-center justify-center rounded-full bg-white/95 shadow-lg">
+                        <PlayCircle
+                          className="size-7 fill-current"
+                          style={{ color: "var(--ed-ink)" }}
+                        />
+                      </span>
+                      <span className="absolute bottom-3 left-3 rounded-md bg-black/65 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                        Intro video
+                      </span>
+                    </a>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <PlayCircle className="size-12 text-white/70" />
+                    </div>
+                  )}
                 </div>
                 <div className="p-6">
                   <div className="text-3xl font-extrabold" style={{ color: "var(--ed-ink)" }}>
@@ -294,6 +384,81 @@ export default async function CourseDetailPage({
 
       <div className="mx-auto grid max-w-7xl gap-12 px-6 py-14 lg:grid-cols-[1fr_360px]">
         <div className="space-y-12">
+          {/* What's included — features pulled from course.features (0013) */}
+          {features.length > 0 && (
+            <section>
+              <h2
+                className="mb-4 text-xl font-extrabold tracking-tight"
+                style={{ color: "var(--ed-ink)" }}
+              >
+                What&apos;s included
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {features.map((f) => {
+                  const def = FEATURE_LABEL[f];
+                  return (
+                    <div
+                      key={f}
+                      className="flex items-start gap-3 rounded-2xl border bg-white p-4"
+                      style={{ borderColor: "var(--ed-line)" }}
+                    >
+                      <span
+                        className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+                        style={{
+                          background: "rgba(141,198,63,0.12)",
+                          color: "var(--ed-green-dark, #4f7f1c)",
+                        }}
+                      >
+                        <def.icon className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <div
+                          className="text-sm font-bold"
+                          style={{ color: "var(--ed-ink)" }}
+                        >
+                          {def.label}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Exam call-out — surfaces graded assessments */}
+          {examCount > 0 && (
+            <section
+              className="flex items-start gap-4 rounded-2xl border p-5"
+              style={{
+                borderColor: "var(--ed-line)",
+                background: "rgba(0,174,239,0.06)",
+              }}
+            >
+              <span
+                className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: "var(--ed-blue)", color: "white" }}
+              >
+                <ClipboardList className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <div
+                  className="text-sm font-extrabold"
+                  style={{ color: "var(--ed-ink)" }}
+                >
+                  {examCount} graded exam{examCount === 1 ? "" : "s"} included
+                </div>
+                <p
+                  className="mt-0.5 text-xs"
+                  style={{ color: "var(--ed-ink-2)" }}
+                >
+                  Test your understanding with timed multiple-choice exams.
+                  Pass to validate your learning and unlock your certificate.
+                </p>
+              </div>
+            </section>
+          )}
+
           {/* About */}
           {course.description && (
             <section>
@@ -404,6 +569,66 @@ export default async function CourseDetailPage({
               No reviews yet — be the first to review after you complete this course.
             </div>
           </section>
+
+          {/* Disclaimer + T&C — surfaces course.disclaimer + course.termsHtml */}
+          {(course.disclaimer || course.termsHtml) && (
+            <section>
+              <h2
+                className="mb-3 text-xl font-extrabold tracking-tight"
+                style={{ color: "var(--ed-ink)" }}
+              >
+                Disclaimer &amp; terms
+              </h2>
+              <div className="space-y-3">
+                {course.disclaimer && (
+                  <details
+                    className="group rounded-2xl border bg-white px-5 py-4"
+                    style={{ borderColor: "var(--ed-line)" }}
+                  >
+                    <summary
+                      className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold"
+                      style={{ color: "var(--ed-ink)" }}
+                    >
+                      Disclaimer
+                      <ChevronDown
+                        className="size-4 transition-transform group-open:rotate-180"
+                        style={{ color: "var(--ed-mute)" }}
+                      />
+                    </summary>
+                    <p
+                      className="mt-2 whitespace-pre-line text-sm leading-relaxed"
+                      style={{ color: "var(--ed-mute)" }}
+                    >
+                      {course.disclaimer}
+                    </p>
+                  </details>
+                )}
+                {course.termsHtml && (
+                  <details
+                    className="group rounded-2xl border bg-white px-5 py-4"
+                    style={{ borderColor: "var(--ed-line)" }}
+                  >
+                    <summary
+                      className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold"
+                      style={{ color: "var(--ed-ink)" }}
+                    >
+                      Terms &amp; conditions
+                      <ChevronDown
+                        className="size-4 transition-transform group-open:rotate-180"
+                        style={{ color: "var(--ed-mute)" }}
+                      />
+                    </summary>
+                    <div
+                      className="mt-2 whitespace-pre-line text-sm leading-relaxed"
+                      style={{ color: "var(--ed-mute)" }}
+                    >
+                      {course.termsHtml}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* FAQ */}
           <section>
