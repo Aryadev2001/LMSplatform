@@ -159,14 +159,21 @@ export default async function PartnerOverviewPage({
                 {TIER_BLURB[tier]}
               </p>
             </div>
-            {tier !== "premium" && (
+            {tier !== "premium" ? (
               <Link
-                href="/partner-program"
+                href="/admin/partner/billing"
                 className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90"
                 style={{ background: "var(--ed-gradient)" }}
               >
                 <Sparkles className="size-4" />
-                See upgrade options
+                Upgrade plan
+              </Link>
+            ) : (
+              <Link
+                href="/admin/partner/billing"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-white/10"
+              >
+                Manage billing
               </Link>
             )}
           </div>

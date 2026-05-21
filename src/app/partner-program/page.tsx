@@ -42,7 +42,7 @@ const TIERS: Tier[] = [
     cadence: "per month",
     blurb:
       "Sell paid courses, take payments through your own Stripe/Razorpay, add modules & exams.",
-    cta: { label: "Upgrade — coming soon", href: "/contact?plan=standard" },
+    cta: { label: "Upgrade to Standard", href: "/admin/partner/billing" },
     highlighted: true,
     icon: Building2,
   },
@@ -53,7 +53,7 @@ const TIERS: Tier[] = [
     cadence: "per month",
     blurb:
       "Everything in Standard + custom domain, certificates, referral discounts, vouchers, and priority support.",
-    cta: { label: "Upgrade — coming soon", href: "/contact?plan=premium" },
+    cta: { label: "Upgrade to Premium", href: "/admin/partner/billing" },
     icon: Award,
   },
 ];
