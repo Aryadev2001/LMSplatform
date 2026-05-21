@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 /**
  * Saved courses ("Wishlist"). localStorage-only by design — same pattern
- * as the guest cart; no schema change, genuinely working end-to-end.
+ * as the guest cart, on `useSyncExternalStore` for React-correct external
+ * subscription (no setState-in-effect smell).
  */
 export interface WishItem {
   programId: string;
@@ -17,33 +18,50 @@ export interface WishItem {
 }
 
 const KEY = "ed-wishlist-v1";
+const EMPTY: WishItem[] = [];
+
+// Stable snapshot cache (see cart.ts for why this matters).
+let cachedRaw: string | null = null;
+let cachedItems: WishItem[] = EMPTY;
 
 function read(): WishItem[] {
+  if (typeof window === "undefined") return EMPTY;
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as WishItem[]) : [];
+    raw = localStorage.getItem(KEY);
   } catch {
-    return [];
+    /* private mode / disabled storage */
   }
+  if (raw === cachedRaw) return cachedItems;
+  cachedRaw = raw;
+  try {
+    cachedItems = raw ? (JSON.parse(raw) as WishItem[]) : EMPTY;
+  } catch {
+    cachedItems = EMPTY;
+  }
+  return cachedItems;
 }
 
 function emit() {
   window.dispatchEvent(new Event("ed-wishlist-changed"));
 }
 
-export function useWishlist() {
-  const [items, setItems] = useState<WishItem[]>([]);
+function subscribe(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("ed-wishlist-changed", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("ed-wishlist-changed", cb);
+    window.removeEventListener("storage", cb);
+  };
+}
 
-  useEffect(() => {
-    setItems(read());
-    const sync = () => setItems(read());
-    window.addEventListener("ed-wishlist-changed", sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener("ed-wishlist-changed", sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
+function getServerSnapshot(): WishItem[] {
+  return EMPTY;
+}
+
+export function useWishlist() {
+  const items = useSyncExternalStore(subscribe, read, getServerSnapshot);
 
   const has = useCallback(
     (programId: string) => items.some((i) => i.programId === programId),
@@ -70,7 +88,7 @@ export function useWishlist() {
   }, []);
 
   const clear = useCallback(() => {
-    localStorage.removeItem(KEY);
+    if (typeof window !== "undefined") localStorage.removeItem(KEY);
     emit();
   }, []);
 

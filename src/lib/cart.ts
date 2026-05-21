@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import {
   getOrSyncCart,
   serverAddItem,
@@ -9,16 +9,17 @@ import {
 } from "@/app/cart/cart-actions";
 
 /**
- * Cart hook with a stable API (`items / add / remove / clear / count`).
+ * Cart hook with a stable API (`items / add / remove / clear / count`),
+ * built on `useSyncExternalStore` so the cross-component subscription
+ * lives in React's recommended primitive (no setState-in-effect smell).
  *
  * Guests: localStorage only (offline-first, instant).
- * Authed:  localStorage is the instant client cache; the DB cart
- *          (carts/cart_items) is the source of truth. On first mount the
- *          guest cart is merged into the server cart (login-merge), then
- *          server items overwrite the local cache and every mutation is
- *          mirrored to the server and reconciled from its authoritative
- *          response (server re-derives price/title — client is never
- *          trusted for money).
+ * Authed:  localStorage is the instant client cache; the DB cart is the
+ *          source of truth. On first mount the guest cart is merged into
+ *          the server cart (login-merge), then server items overwrite the
+ *          local cache and every mutation is reconciled from the server's
+ *          authoritative response (price/title never trusted from the
+ *          client).
  */
 export interface CartItem {
   programId: string;
@@ -31,18 +32,34 @@ export interface CartItem {
 }
 
 const KEY = "ed-cart-v1";
+const EMPTY: CartItem[] = [];
 
-// Module-scoped so all useCart() instances agree and sync runs once/page.
+// Module-scoped so every useCart() consumer agrees + sync runs once/page.
 let authedMode = false;
 let syncStarted = false;
 
+// Snapshot cache keyed by the raw localStorage string for referential
+// stability (useSyncExternalStore requires getSnapshot to return the same
+// ref when the data hasn't changed — otherwise infinite re-renders).
+let cachedRaw: string | null = null;
+let cachedItems: CartItem[] = EMPTY;
+
 function read(): CartItem[] {
+  if (typeof window === "undefined") return EMPTY;
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+    raw = localStorage.getItem(KEY);
   } catch {
-    return [];
+    /* private mode / disabled storage */
   }
+  if (raw === cachedRaw) return cachedItems;
+  cachedRaw = raw;
+  try {
+    cachedItems = raw ? (JSON.parse(raw) as CartItem[]) : EMPTY;
+  } catch {
+    cachedItems = EMPTY;
+  }
+  return cachedItems;
 }
 
 function writeAll(items: CartItem[]) {
@@ -54,35 +71,38 @@ function emit() {
   window.dispatchEvent(new Event("ed-cart-changed"));
 }
 
+function subscribe(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("ed-cart-changed", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("ed-cart-changed", cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function getServerSnapshot(): CartItem[] {
+  return EMPTY;
+}
+
 export function useCart() {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const items = useSyncExternalStore(subscribe, read, getServerSnapshot);
 
+  // First mounted hook drives the one-time server sync / login-merge.
   useEffect(() => {
-    setItems(read());
-    const sync = () => setItems(read());
-    window.addEventListener("ed-cart-changed", sync);
-    window.addEventListener("storage", sync);
-
-    // First mounted hook drives the one-time server sync / login-merge.
-    if (!syncStarted) {
-      syncStarted = true;
-      const localIds = read().map((i) => i.programId);
-      getOrSyncCart(localIds)
-        .then((res) => {
-          if (res.authed) {
-            authedMode = true;
-            writeAll(res.items);
-          }
-        })
-        .catch(() => {
-          /* offline / transient — keep the local cache as-is */
-        });
-    }
-
-    return () => {
-      window.removeEventListener("ed-cart-changed", sync);
-      window.removeEventListener("storage", sync);
-    };
+    if (syncStarted) return;
+    syncStarted = true;
+    const localIds = read().map((i) => i.programId);
+    getOrSyncCart(localIds)
+      .then((res) => {
+        if (res.authed) {
+          authedMode = true;
+          writeAll(res.items);
+        }
+      })
+      .catch(() => {
+        /* offline / transient — keep the local cache as-is */
+      });
   }, []);
 
   const add = useCallback((item: CartItem) => {
@@ -107,11 +127,9 @@ export function useCart() {
   }, []);
 
   const clear = useCallback(() => {
-    localStorage.removeItem(KEY);
+    if (typeof window !== "undefined") localStorage.removeItem(KEY);
     emit();
-    if (authedMode) {
-      serverClearCart().catch(() => {});
-    }
+    if (authedMode) serverClearCart().catch(() => {});
   }, []);
 
   return { items, add, remove, clear, count: items.length };
