@@ -17,11 +17,14 @@ import {
 } from "lucide-react";
 
 export type DashRole = "admin" | "student" | "super";
+export type PartnerTier = "basic" | "standard" | "premium";
 
 export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  /** Minimum partner tier to use this link. Omit = available to Basic. */
+  minTier?: PartnerTier;
 };
 
 export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
@@ -29,11 +32,11 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
     { label: "Overview", href: "/admin", icon: LayoutDashboard },
     { label: "Partner Setup", href: "/admin/partner", icon: UserSquare2 },
     { label: "Students", href: "/admin/students", icon: GraduationCap },
-    { label: "Courses", href: "/admin/programs", icon: BookOpen },
-    { label: "AI Services", href: "/admin/ai-services", icon: Sparkles },
-    { label: "Diagnostics", href: "/admin/diagnostics", icon: Activity },
-    { label: "Enrollments", href: "/admin/enrollments", icon: ClipboardList },
-    { label: "Payments", href: "/admin/payments", icon: CreditCard },
+    { label: "Courses", href: "/admin/programs", icon: BookOpen, minTier: "standard" },
+    { label: "Enrollments", href: "/admin/enrollments", icon: ClipboardList, minTier: "standard" },
+    { label: "Payments", href: "/admin/payments", icon: CreditCard, minTier: "standard" },
+    { label: "AI Services", href: "/admin/ai-services", icon: Sparkles, minTier: "premium" },
+    { label: "Diagnostics", href: "/admin/diagnostics", icon: Activity, minTier: "premium" },
     { label: "Settings", href: "/admin/settings", icon: Settings },
   ],
   student: [

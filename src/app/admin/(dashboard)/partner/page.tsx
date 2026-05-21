@@ -15,17 +15,13 @@ import {
   Circle,
   ArrowRight,
   Sparkles,
+  Lock,
 } from "lucide-react";
+import { TIER_LABEL, type PartnerTier } from "@/lib/tier-lock";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Partner overview — eurodigital.coach" };
-
-const TIER_LABEL = {
-  basic: "Basic",
-  standard: "Standard",
-  premium: "Premium",
-} as const;
 
 const TIER_BLURB = {
   basic: "Free courses only. Upgrade to publish paid courses.",
@@ -33,9 +29,14 @@ const TIER_BLURB = {
   premium: "Everything in Standard + custom domain + priority support.",
 } as const;
 
-export default async function PartnerOverviewPage() {
+export default async function PartnerOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ locked?: string; min?: string }>;
+}) {
   await requireRole("admin");
   const tenantId = await requireTenantId();
+  const { locked, min } = await searchParams;
 
   const [row] = await db
     .select({
@@ -85,12 +86,51 @@ export default async function PartnerOverviewPage() {
     },
   ];
 
+  const lockedMin = (min ?? "standard") as PartnerTier;
+  const lockedMinLabel = TIER_LABEL[lockedMin] ?? "Standard";
+
   return (
     <div className="space-y-8">
       <PageHeader
         title="Partner overview"
         description="Your current plan, your storefront profile, and what's left to complete."
       />
+
+      {/* Upgrade-nudge banner when the user arrived via requireTier() redirect */}
+      {locked && (
+        <div
+          className="flex flex-col gap-3 rounded-2xl border p-4 md:flex-row md:items-center md:justify-between"
+          style={{
+            borderColor: "rgba(0,174,239,0.3)",
+            background: "rgba(0,174,239,0.08)",
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: "var(--ed-blue)" }}
+            >
+              <Lock className="size-4 text-white" />
+            </span>
+            <div>
+              <div className="text-sm font-bold" style={{ color: "var(--ed-ink)" }}>
+                {locked} is a {lockedMinLabel}-tier feature
+              </div>
+              <div className="mt-0.5 text-xs" style={{ color: "var(--ed-ink-2)" }}>
+                Upgrade your partner plan to unlock {locked.toLowerCase()} and
+                the rest of the {lockedMinLabel} toolkit.
+              </div>
+            </div>
+          </div>
+          <Link
+            href="/partner-program"
+            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90"
+            style={{ background: "var(--ed-gradient)" }}
+          >
+            See upgrade options <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* Tier card */}
       <Card className="overflow-hidden">

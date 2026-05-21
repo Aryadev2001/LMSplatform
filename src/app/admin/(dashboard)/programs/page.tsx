@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { programs } from "@/db/schema";
 import { and, eq, desc, ilike } from "drizzle-orm";
 import { requireTenantId } from "@/lib/tenant";
+import { requireTier } from "@/lib/tier-lock";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { Card } from "@/components/ui/card";
@@ -27,6 +28,7 @@ export default async function AdminProgramsPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
+  await requireTier("standard", "Courses");
   const tenantId = await requireTenantId();
   const search = q?.trim();
   const rows = await db
@@ -138,6 +140,16 @@ export default async function AdminProgramsPage({
                           durationMonths: p.durationMonths,
                           isActive: p.isActive,
                           imageUrl: p.imageUrl,
+                          language: p.language,
+                          features: (p.features as
+                            | ("certificate" | "q_bank" | "hands_on" | "mentor_qa")[]
+                            | null) ?? [],
+                          introVideoUrl: p.introVideoUrl,
+                          workshopVideoUrl: p.workshopVideoUrl,
+                          totalDurationHours: p.totalDurationHours,
+                          disclaimer: p.disclaimer,
+                          termsHtml: p.termsHtml,
+                          certificateTemplateUrl: p.certificateTemplateUrl,
                         }}
                       />
                     </div>

@@ -23,6 +23,9 @@ import {
 import { FileUpload } from "@/components/file-upload";
 import { createProgram, updateProgram } from "../actions";
 
+const FEATURE_KEYS = ["certificate", "q_bank", "hands_on", "mentor_qa"] as const;
+type FeatureKey = (typeof FEATURE_KEYS)[number];
+
 const Schema = z.object({
   name: z.string().min(2, "Name is required").max(200),
   description: z.string().max(2000).optional().or(z.literal("")),
@@ -31,6 +34,15 @@ const Schema = z.object({
   durationMonths: z.coerce.number().int().min(1).max(60),
   isActive: z.boolean(),
   imageUrl: z.string().optional().or(z.literal("")),
+  // 0013 extensions
+  language: z.enum(["en", "ar", "hi"]),
+  features: z.array(z.enum(FEATURE_KEYS)),
+  introVideoUrl: z.string().optional().or(z.literal("")),
+  workshopVideoUrl: z.string().optional().or(z.literal("")),
+  totalDurationHours: z.coerce.number().int().min(0).max(10000),
+  disclaimer: z.string().max(4000).optional().or(z.literal("")),
+  termsHtml: z.string().max(20000).optional().or(z.literal("")),
+  certificateTemplateUrl: z.string().optional().or(z.literal("")),
 });
 
 type Values = z.input<typeof Schema>;
@@ -46,8 +58,23 @@ interface ProgramDialogProps {
     durationMonths: number;
     isActive: boolean;
     imageUrl?: string | null;
+    language?: "en" | "ar" | "hi" | null;
+    features?: FeatureKey[] | null;
+    introVideoUrl?: string | null;
+    workshopVideoUrl?: string | null;
+    totalDurationHours?: number | null;
+    disclaimer?: string | null;
+    termsHtml?: string | null;
+    certificateTemplateUrl?: string | null;
   };
 }
+
+const FEATURE_LABELS: Record<FeatureKey, string> = {
+  certificate: "Certificate of Completion",
+  q_bank: "Q-Bank & Mock Exams",
+  hands_on: "Hands-on Labs",
+  mentor_qa: "Mentor Q&A Sessions",
+};
 
 export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) {
   const [open, setOpen] = useState(false);
@@ -62,14 +89,35 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
       durationMonths: initial?.durationMonths ?? 3,
       isActive: initial?.isActive ?? true,
       imageUrl: initial?.imageUrl ?? "",
+      language: (initial?.language ?? "en") as "en" | "ar" | "hi",
+      features: (initial?.features ?? []) as FeatureKey[],
+      introVideoUrl: initial?.introVideoUrl ?? "",
+      workshopVideoUrl: initial?.workshopVideoUrl ?? "",
+      totalDurationHours: initial?.totalDurationHours ?? 0,
+      disclaimer: initial?.disclaimer ?? "",
+      termsHtml: initial?.termsHtml ?? "",
+      certificateTemplateUrl: initial?.certificateTemplateUrl ?? "",
     },
   });
   const isActive = watch("isActive");
   const imageUrl = watch("imageUrl");
+  const features = watch("features") ?? [];
+  const language = watch("language");
+  const introVideoUrl = watch("introVideoUrl");
+  const workshopVideoUrl = watch("workshopVideoUrl");
+  const certificateTemplateUrl = watch("certificateTemplateUrl");
+
+  function toggleFeature(key: FeatureKey, checked: boolean) {
+    const set = new Set(features);
+    if (checked) set.add(key);
+    else set.delete(key);
+    setValue("features", Array.from(set) as FeatureKey[]);
+  }
 
   function onSubmit(values: Values) {
     const priceNum = Number(values.priceDollars);
     const durationNum = Number(values.durationMonths);
+    const hoursNum = Number(values.totalDurationHours);
     startTransition(async () => {
       const payload = {
         name: values.name,
@@ -79,6 +127,14 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
         durationMonths: durationNum,
         isActive: !!values.isActive,
         imageUrl: values.imageUrl ?? "",
+        language: values.language,
+        features: values.features,
+        introVideoUrl: values.introVideoUrl ?? "",
+        workshopVideoUrl: values.workshopVideoUrl ?? "",
+        totalDurationHours: hoursNum,
+        disclaimer: values.disclaimer ?? "",
+        termsHtml: values.termsHtml ?? "",
+        certificateTemplateUrl: values.certificateTemplateUrl ?? "",
       };
       const r = mode === "edit" && initial
         ? await updateProgram(initial.id, payload)
@@ -104,14 +160,16 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
           <Plus className="size-4" /> New program
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Edit program" : "Create program"}</DialogTitle>
           <DialogDescription>
             Programs are the packages students enroll in.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          {/* ---- Basics ---- */}
+          <SectionTitle>Basics</SectionTitle>
           <Field label="Name" error={errors.name?.message}>
             <Input {...register("name")} placeholder="Founder OS" className="h-10 rounded-xl border-black/10" />
           </Field>
@@ -127,6 +185,7 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
               onClear={() => setValue("imageUrl", "")}
             />
           </Field>
+
           <div className="grid grid-cols-3 gap-3">
             <Field label="Price" error={errors.priceDollars?.message}>
               <div className="relative">
@@ -146,6 +205,31 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
               <Input {...register("durationMonths")} type="number" min="1" className="h-10 rounded-xl border-black/10" />
             </Field>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Total duration (hours)" optional>
+              <Input
+                {...register("totalDurationHours")}
+                type="number"
+                min="0"
+                className="h-10 rounded-xl border-black/10"
+              />
+            </Field>
+            <Field label="Language">
+              <select
+                value={language}
+                onChange={(e) =>
+                  setValue("language", e.target.value as "en" | "ar" | "hi")
+                }
+                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+              >
+                <option value="en">English</option>
+                <option value="ar">Arabic</option>
+                <option value="hi">Hindi</option>
+              </select>
+            </Field>
+          </div>
+
           <div className="flex items-center gap-2 rounded-xl border border-black/8 bg-secondary/40 p-3">
             <Checkbox
               id="isActive"
@@ -156,6 +240,84 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
               Active — students can enroll
             </Label>
           </div>
+
+          {/* ---- Features ---- */}
+          <SectionTitle>Features</SectionTitle>
+          <div className="grid grid-cols-2 gap-2">
+            {FEATURE_KEYS.map((k) => (
+              <label
+                key={k}
+                className="flex cursor-pointer items-center gap-2 rounded-xl border border-black/8 bg-secondary/30 p-3 text-sm"
+              >
+                <Checkbox
+                  checked={features.includes(k)}
+                  onCheckedChange={(c) => toggleFeature(k, !!c)}
+                />
+                <span>{FEATURE_LABELS[k]}</span>
+              </label>
+            ))}
+          </div>
+
+          {/* ---- Videos ---- */}
+          <SectionTitle>Videos</SectionTitle>
+          <Field label="Intro video URL" optional>
+            <Input
+              {...register("introVideoUrl")}
+              type="url"
+              placeholder="https://… (course intro/trailer)"
+              className="h-10 rounded-xl border-black/10"
+            />
+            {introVideoUrl && (
+              <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                {introVideoUrl}
+              </p>
+            )}
+          </Field>
+          <Field label="Workshop video URL" optional>
+            <Input
+              {...register("workshopVideoUrl")}
+              type="url"
+              placeholder="https://… (recorded workshop / masterclass)"
+              className="h-10 rounded-xl border-black/10"
+            />
+            {workshopVideoUrl && (
+              <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                {workshopVideoUrl}
+              </p>
+            )}
+          </Field>
+
+          {/* ---- Certificate ---- */}
+          <SectionTitle>Certificate</SectionTitle>
+          <Field label="Certificate template" optional>
+            <FileUpload
+              accept="image/*,application/pdf"
+              label="Upload certificate template"
+              value={certificateTemplateUrl || null}
+              onUploaded={(url) => setValue("certificateTemplateUrl", url)}
+              onClear={() => setValue("certificateTemplateUrl", "")}
+            />
+          </Field>
+
+          {/* ---- Legal ---- */}
+          <SectionTitle>Legal</SectionTitle>
+          <Field label="Disclaimer" optional>
+            <Textarea
+              {...register("disclaimer")}
+              rows={3}
+              placeholder="e.g. Results may vary. This course does not guarantee certification or employment."
+              className="rounded-xl border-black/10"
+            />
+          </Field>
+          <Field label="Terms & conditions (HTML or plain text)" optional>
+            <Textarea
+              {...register("termsHtml")}
+              rows={4}
+              placeholder="Refund policy, attendance policy, completion criteria…"
+              className="rounded-xl border-black/10 font-mono text-[12px]"
+            />
+          </Field>
+
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-xl">
               Cancel
@@ -168,6 +330,14 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-3 border-b pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground first:mt-0">
+      {children}
+    </div>
   );
 }
 

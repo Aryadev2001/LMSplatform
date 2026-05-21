@@ -23,6 +23,14 @@ async function autoSyncPlan(tenantId: string, programId: string) {
 }
 
 // ---------- Program CRUD ----------
+const COURSE_FEATURE_KEYS = [
+  "certificate",
+  "q_bank",
+  "hands_on",
+  "mentor_qa",
+] as const;
+const courseFeatureEnum = z.enum(COURSE_FEATURE_KEYS);
+
 const ProgramSchema = z.object({
   name: z.string().min(2).max(200),
   description: z.string().max(2000).optional().or(z.literal("")),
@@ -31,6 +39,20 @@ const ProgramSchema = z.object({
   durationMonths: z.number().int().min(1).max(60),
   isActive: z.boolean().default(true),
   imageUrl: z.string().trim().max(2000).optional().or(z.literal("")),
+  // ---- 0013 course extensions ----
+  language: z.enum(["en", "ar", "hi"]).default("en"),
+  features: z.array(courseFeatureEnum).default([]),
+  introVideoUrl: z.string().trim().max(2000).optional().or(z.literal("")),
+  workshopVideoUrl: z.string().trim().max(2000).optional().or(z.literal("")),
+  totalDurationHours: z.number().int().min(0).max(10000).default(0),
+  disclaimer: z.string().max(4000).optional().or(z.literal("")),
+  termsHtml: z.string().max(20000).optional().or(z.literal("")),
+  certificateTemplateUrl: z
+    .string()
+    .trim()
+    .max(2000)
+    .optional()
+    .or(z.literal("")),
 });
 
 export type ProgramResult = { success: true; id: string } | { success: false; error: string };
@@ -76,6 +98,14 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
       durationMonths: parsed.data.durationMonths,
       isActive: parsed.data.isActive,
       imageUrl: parsed.data.imageUrl || null,
+      language: parsed.data.language,
+      features: parsed.data.features,
+      introVideoUrl: parsed.data.introVideoUrl || null,
+      workshopVideoUrl: parsed.data.workshopVideoUrl || null,
+      totalDurationHours: parsed.data.totalDurationHours,
+      disclaimer: parsed.data.disclaimer || null,
+      termsHtml: parsed.data.termsHtml || null,
+      certificateTemplateUrl: parsed.data.certificateTemplateUrl || null,
       tenantId,
     })
     .returning({ id: programs.id });
@@ -118,6 +148,14 @@ export async function updateProgram(
       durationMonths: parsed.data.durationMonths,
       isActive: parsed.data.isActive,
       imageUrl: parsed.data.imageUrl || null,
+      language: parsed.data.language,
+      features: parsed.data.features,
+      introVideoUrl: parsed.data.introVideoUrl || null,
+      workshopVideoUrl: parsed.data.workshopVideoUrl || null,
+      totalDurationHours: parsed.data.totalDurationHours,
+      disclaimer: parsed.data.disclaimer || null,
+      termsHtml: parsed.data.termsHtml || null,
+      certificateTemplateUrl: parsed.data.certificateTemplateUrl || null,
       updatedAt: new Date(),
     })
     .where(and(eq(programs.id, id), eq(programs.tenantId, tenantId)));

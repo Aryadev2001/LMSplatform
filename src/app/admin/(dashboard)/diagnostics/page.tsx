@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { diagnosticSubmissions } from "@/db/schema";
 import { desc, and, or, ilike, eq, type SQL } from "drizzle-orm";
 import { requireTenantId } from "@/lib/tenant";
+import { requireTier } from "@/lib/tier-lock";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card } from "@/components/ui/card";
@@ -35,6 +36,7 @@ export default async function AdminDiagnosticsPage({
   searchParams: Promise<{ q?: string; stage?: string }>;
 }) {
   const { q, stage } = await searchParams;
+  await requireTier("premium", "Diagnostics");
   const tenantId = await requireTenantId();
   const search = q?.trim();
   const validStages = ["foundation", "growth", "scale"];

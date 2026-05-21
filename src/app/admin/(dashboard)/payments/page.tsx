@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { payments, enrollments, users } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { requireTenantId } from "@/lib/tenant";
+import { requireTier } from "@/lib/tier-lock";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -33,6 +34,7 @@ export default async function AdminPaymentsPage({
   searchParams: Promise<{ status?: string; q?: string }>;
 }) {
   const { status, q } = await searchParams;
+  await requireTier("standard", "Payments");
   const tenantId = await requireTenantId();
   const search = q?.trim()?.toLowerCase();
   const activeFilter: StatusFilter = (STATUS_FILTERS as readonly string[]).includes(status ?? "")

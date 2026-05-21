@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/db/client";
-import { users, students, programs } from "@/db/schema";
-import { eq, and, or, ilike, inArray } from "drizzle-orm";
+import { users, students, programs, enrollments } from "@/db/schema";
+import { eq, and, or, ilike, inArray, sql } from "drizzle-orm";
 import { STUDENT_DB_ROLES } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -30,15 +30,33 @@ export default async function AdminStudentsPage({
   const { q } = await searchParams;
   const tenantId = await requireTenantId();
   const search = q?.trim();
+  // Restricted to PAYING students per the partner-dashboard lockdown: only
+  // users with at least one paid/account_created/assigned enrollment in
+  // this tenant. A user who only enrolled in free courses, or who's a
+  // signed-up learner without payment, won't appear here.
+  const paidUserIdsSubquery = db
+    .selectDistinct({ id: enrollments.userId })
+    .from(enrollments)
+    .innerJoin(programs, eq(programs.id, enrollments.programId))
+    .where(
+      and(
+        eq(programs.tenantId, tenantId),
+        inArray(enrollments.status, ["paid", "account_created", "assigned"]),
+        sql`${enrollments.userId} IS NOT NULL`,
+      ),
+    );
+
   const studentWhere = search
     ? and(
         eq(users.tenantId, tenantId),
         inArray(users.role, [...STUDENT_DB_ROLES]),
+        inArray(users.id, paidUserIdsSubquery),
         or(ilike(users.fullName, `%${search}%`), ilike(users.email, `%${search}%`)),
       )
     : and(
         eq(users.tenantId, tenantId),
         inArray(users.role, [...STUDENT_DB_ROLES]),
+        inArray(users.id, paidUserIdsSubquery),
       );
 
   const [studentRows, programOptions] = await Promise.all([
@@ -69,8 +87,8 @@ export default async function AdminStudentsPage({
     <div className="mx-auto max-w-7xl">
       <PageHeader
         eyebrow="— Students"
-        title="Manage students"
-        description="Every paying student. Assign a coach and program from this view."
+        title="Paying students"
+        description="Only students with a paid enrollment in your courses. Free signups and unfulfilled enrollments aren't shown."
       />
 
       <div className="mb-4">

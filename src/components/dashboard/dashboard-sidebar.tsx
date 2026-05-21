@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Lock } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,16 +17,24 @@ import {
 } from "@/components/ui/sidebar";
 import { BrandMark } from "@/components/brand";
 import { EuroLogo } from "@/components/euro/euro-logo";
-import { NAV_ITEMS, ROLE_LABELS, type DashRole } from "./nav-items";
+import { NAV_ITEMS, ROLE_LABELS, type DashRole, type PartnerTier } from "./nav-items";
 import type { TenantBrand } from "./dashboard-shell";
+
+const TIER_RANK: Record<PartnerTier, number> = {
+  basic: 0,
+  standard: 1,
+  premium: 2,
+};
 
 interface DashboardSidebarProps {
   role: DashRole;
   brand?: TenantBrand;
+  tier?: PartnerTier;
 }
 
-export function DashboardSidebar({ role, brand }: DashboardSidebarProps) {
+export function DashboardSidebar({ role, brand, tier }: DashboardSidebarProps) {
   const items = NAV_ITEMS[role];
+  const activeTier: PartnerTier = tier ?? "basic";
   const roleLabel = ROLE_LABELS[role];
   const brandName = brand?.name ?? "eurodigital.coach";
   // Show the eurodigital wordmark when we're branded as the platform itself
@@ -81,19 +90,29 @@ export function DashboardSidebar({ role, brand }: DashboardSidebarProps) {
             <SidebarMenu>
               {items.map((item) => {
                 const isActive = isActiveLink(item.href);
+                const isLocked =
+                  role === "admin" &&
+                  !!item.minTier &&
+                  TIER_RANK[activeTier] < TIER_RANK[item.minTier];
+                const href = isLocked
+                  ? `/admin/partner?locked=${encodeURIComponent(item.label)}&min=${item.minTier}`
+                  : item.href;
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
-                      render={<Link href={item.href} />}
+                      render={<Link href={href} />}
                       isActive={isActive}
-                      tooltip={item.label}
+                      tooltip={isLocked ? `${item.label} — ${item.minTier} tier` : item.label}
                       className="group/btn relative"
                     >
                       {isActive && (
                         <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-r-full bg-foreground group-data-[collapsible=icon]:hidden" />
                       )}
-                      <item.icon className="size-4" />
-                      <span>{item.label}</span>
+                      <item.icon className={`size-4 ${isLocked ? "opacity-50" : ""}`} />
+                      <span className={isLocked ? "opacity-50" : ""}>{item.label}</span>
+                      {isLocked && (
+                        <Lock className="ml-auto size-3 opacity-60 group-data-[collapsible=icon]:hidden" />
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
