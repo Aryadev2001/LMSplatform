@@ -13,6 +13,7 @@ import {
   Gift,
   Library,
   Sparkles,
+  UserSquare2,
 } from "lucide-react";
 
 export type DashRole = "admin" | "student" | "super";
@@ -26,6 +27,7 @@ export type NavItem = {
 export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
   admin: [
     { label: "Overview", href: "/admin", icon: LayoutDashboard },
+    { label: "Partner Setup", href: "/admin/partner", icon: UserSquare2 },
     { label: "Students", href: "/admin/students", icon: GraduationCap },
     { label: "Courses", href: "/admin/programs", icon: BookOpen },
     { label: "AI Services", href: "/admin/ai-services", icon: Sparkles },
