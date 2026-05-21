@@ -157,7 +157,7 @@ export default async function DiagnosticResultsPage({
             </h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Fix these first — they're dragging your score down the most.
+            Fix these first — they&apos;re dragging your score down the most.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {bottlenecks.map((b, i) => (

@@ -149,7 +149,7 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
               className="mt-1 text-sm"
               style={{ color: "var(--ed-mute)" }}
             >
-              Tell us about your institute and we'll review and email your
+              Tell us about your institute and we&apos;ll review and email your
               dashboard login details.
             </p>
             <Link
