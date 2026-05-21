@@ -35,6 +35,28 @@ const ProgramSchema = z.object({
 
 export type ProgramResult = { success: true; id: string } | { success: false; error: string };
 
+/** Creator-tier tenants (self-serve signups) can only publish FREE courses;
+ *  paid courses require the invite-only partner program. */
+async function assertPriceAllowed(
+  tenantId: string,
+  priceCents: number,
+): Promise<ProgramResult | null> {
+  if (priceCents === 0) return null;
+  const [t] = await db
+    .select({ creatorOnly: tenants.creatorOnly })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (t?.creatorOnly) {
+    return {
+      success: false,
+      error:
+        "Paid courses require the partner program — apply at /contact. Your creator tier supports free courses only.",
+    };
+  }
+  return null;
+}
+
 export async function createProgram(input: z.infer<typeof ProgramSchema>): Promise<ProgramResult> {
   await requireRole("admin");
   const tenantId = await requireTenantId();
@@ -42,6 +64,8 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
+  const blocked = await assertPriceAllowed(tenantId, parsed.data.priceCents);
+  if (blocked) return blocked;
   const [row] = await db
     .insert(programs)
     .values({
@@ -82,6 +106,8 @@ export async function updateProgram(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
+  const blocked = await assertPriceAllowed(tenantId, parsed.data.priceCents);
+  if (blocked) return blocked;
   await db
     .update(programs)
     .set({

@@ -192,6 +192,10 @@ export const tenants = pgTable(
     // (1500 = 15%); the institute's payout is the remainder. Super-admin
     // managed; institutes cannot change their own rate.
     platformFeeBps: integer("platform_fee_bps").notNull().default(1500),
+    // Self-serve creator tier: anyone can sign up as Creator, gets a
+    // personal tenant flagged creatorOnly=true, can only publish FREE
+    // courses. Real partners (invite-only) stay creatorOnly=false.
+    creatorOnly: boolean("creator_only").notNull().default(false),
     // Lifecycle
     status: tenantStatusEnum("status").notNull().default("ACTIVE"),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),

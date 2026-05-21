@@ -96,12 +96,18 @@ const resolveCurrentUser = async (): Promise<CurrentUser | null> => {
   // required for invites to work end-to-end.
   try {
     const cu = await currentUser();
-    const meta = (cu?.publicMetadata ?? {}) as {
+    const pub = (cu?.publicMetadata ?? {}) as {
       role?: string;
       tenantId?: string;
     };
-    const rawMeta = meta.role ?? null;
+    // Self-serve sign-ups carry their role in unsafeMetadata (set client-side
+    // by the SignUp component); invited admins/students use publicMetadata
+    // (set server-side at invitation time).
+    const uns = (cu?.unsafeMetadata ?? {}) as { role?: string };
+    const rawMeta = pub.role ?? uns.role ?? null;
     const email = cu?.primaryEmailAddress?.emailAddress ?? null;
+    const fullName =
+      [cu?.firstName, cu?.lastName].filter(Boolean).join(" ").trim() || null;
 
     // Can't determine a role → leave unprovisioned (→ /onboarding).
     if (!rawMeta || !email) {
@@ -114,6 +120,80 @@ const resolveCurrentUser = async (): Promise<CurrentUser | null> => {
       };
     }
 
+    // Self-serve creator sign-up: auto-provision a personal tenant
+    // (creator_only=true → can only publish free courses) and become its
+    // TENANT_ADMIN. Paid courses still require the invite-only partner
+    // program (enforced in createProgram).
+    if (rawMeta.toLowerCase() === "creator") {
+      const makeSlug = () => `c-${Math.random().toString(36).slice(2, 10)}`;
+      let tenantId: string | null = null;
+      for (let i = 0; i < 3 && !tenantId; i++) {
+        try {
+          const [t] = await db
+            .insert(tenants)
+            .values({
+              slug: makeSlug(),
+              name: fullName ? `${fullName}'s page` : "My page",
+              status: "ACTIVE",
+              creatorOnly: true,
+            })
+            .returning({ id: tenants.id });
+          tenantId = t.id;
+        } catch {
+          /* slug collision (1 in ~3T) — retry */
+        }
+      }
+      if (!tenantId) {
+        // Could not provision; render as unprovisioned learner-ish.
+        return {
+          userId,
+          rawRole: null,
+          role: null,
+          tenantId: null,
+          email,
+        };
+      }
+
+      try {
+        await db.insert(users).values({
+          clerkId: userId,
+          email,
+          fullName,
+          role: CANONICAL_ADMIN,
+          isSuperAdmin: false,
+          tenantId,
+        });
+      } catch {
+        const [again] = await db
+          .select({
+            role: users.role,
+            email: users.email,
+            tenantId: users.tenantId,
+          })
+          .from(users)
+          .where(eq(users.clerkId, userId))
+          .limit(1);
+        if (again) {
+          const raw = again.role as RawRole;
+          return {
+            userId,
+            rawRole: raw,
+            role: normalizeRole(raw),
+            tenantId: again.tenantId,
+            email: again.email,
+          };
+        }
+      }
+
+      return {
+        userId,
+        rawRole: CANONICAL_ADMIN,
+        role: "admin",
+        tenantId,
+        email,
+      };
+    }
+
     // Canonicalize like the webhook does; super roles pass through tenant-less.
     const canonical: RawRole = isAdminRole(rawMeta)
       ? CANONICAL_ADMIN
@@ -122,9 +202,7 @@ const resolveCurrentUser = async (): Promise<CurrentUser | null> => {
         : (rawMeta as RawRole);
     const isSuper = SUPER_ROLES.includes(canonical);
     const tenantId =
-      !isSuper && typeof meta.tenantId === "string" ? meta.tenantId : null;
-    const fullName =
-      [cu?.firstName, cu?.lastName].filter(Boolean).join(" ").trim() || null;
+      !isSuper && typeof pub.tenantId === "string" ? pub.tenantId : null;
 
     try {
       await db.insert(users).values({

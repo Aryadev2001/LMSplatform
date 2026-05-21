@@ -6,7 +6,6 @@ import { SignUp } from "@clerk/nextjs";
 import {
   GraduationCap,
   Building2,
-  ArrowRight,
   Tag,
   Check,
 } from "lucide-react";
@@ -20,15 +19,15 @@ const ROLES = [
     icon: GraduationCap,
   },
   {
-    id: "institute",
-    label: "Institute",
-    sub: "Sell courses to students",
+    id: "creator",
+    label: "Creator",
+    sub: "Publish your own free courses",
     icon: Building2,
   },
 ] as const;
 
 export function SignUpPanel({ refCode }: { refCode: string | null }) {
-  const [role, setRole] = useState<"learner" | "institute">("learner");
+  const [role, setRole] = useState<"learner" | "creator">("learner");
 
   return (
     <div>
@@ -126,51 +125,38 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
             />
           </div>
         ) : (
-          <div
-            className="rounded-2xl border p-6 text-center"
-            style={{ borderColor: "var(--ed-line)", background: "white" }}
-          >
-            <span
-              className="mx-auto flex size-11 items-center justify-center rounded-2xl"
-              style={{ background: "var(--ed-bg)" }}
+          <div>
+            <div
+              className="mb-5 rounded-xl border px-4 py-3 text-[12px]"
+              style={{
+                borderColor: "var(--ed-line)",
+                background: "rgba(0,174,239,0.06)",
+                color: "var(--ed-ink-2)",
+              }}
             >
-              <Building2
-                className="size-5"
-                style={{ color: "var(--ed-blue)" }}
-              />
-            </span>
-            <h3
-              className="mt-3 text-base font-bold"
-              style={{ color: "var(--ed-ink)" }}
-            >
-              Partner access is invite-only
-            </h3>
-            <p
-              className="mt-1 text-sm"
-              style={{ color: "var(--ed-mute)" }}
-            >
-              Tell us about your institute and we&apos;ll review and email your
-              dashboard login details.
-            </p>
-            <Link
-              href="/contact"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
-              style={{ background: "var(--ed-gradient)" }}
-            >
-              Apply to join <ArrowRight className="size-4" />
-            </Link>
-            <p
-              className="mt-3 text-[11px]"
-              style={{ color: "var(--ed-mute)" }}
-            >
-              Already a partner?{" "}
+              You&apos;re signing up as a <strong>Creator</strong>. You&apos;ll
+              get a personal page where you can publish <strong>free</strong>{" "}
+              courses to the marketplace. Paid courses are available via the
+              partner program —{" "}
               <Link
-                href="/admin/login"
+                href="/contact"
                 className="font-semibold underline underline-offset-2"
               >
-                Institute login
+                apply here
               </Link>
-            </p>
+              .
+            </div>
+            <div className="euro-clerk">
+              <SignUp
+                appearance={clerkAppearance}
+                routing="path"
+                path="/sign-up"
+                signInUrl="/sign-in"
+                forceRedirectUrl="/post-login"
+                fallbackRedirectUrl="/post-login"
+                unsafeMetadata={{ role: "creator" }}
+              />
+            </div>
           </div>
         )}
       </div>
