@@ -38,19 +38,20 @@ export const RESERVED_SUBDOMAINS = new Set([
 
 /**
  * Which product portal a host points at. `partner.<root>` → the tenant
- * dashboard, `student.<root>` → the student dashboard, anything else
- * (apex / institute subdomain / local) → null (the public LMS).
- * Pure string parse — safe for middleware.
+ * dashboard, `student.<root>` → the student dashboard, `admin.<root>` →
+ * the super-admin console, anything else (apex / institute subdomain /
+ * local) → null (the public LMS). Pure string parse — safe for middleware.
  */
 export function portalForHost(
   hostHeader: string | null | undefined,
-): "partner" | "student" | null {
+): "partner" | "student" | "super" | null {
   if (!hostHeader) return null;
   const host = hostHeader.toLowerCase().split(":")[0].trim();
   const root = getRootDomain();
   if (!root) return null;
   if (host === `partner.${root}`) return "partner";
   if (host === `student.${root}`) return "student";
+  if (host === `admin.${root}`) return "super";
   return null;
 }
 

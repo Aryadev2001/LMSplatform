@@ -34,7 +34,7 @@ export default async function PostLoginPage({
   const root = getRootDomain();
   const target = (() => {
     if (user.role === "super") {
-      return root ? `https://${root}/super-admin` : "/super-admin";
+      return root ? `https://admin.${root}/super-admin` : "/super-admin";
     }
     if (user.role === "admin") {
       return root ? `https://partner.${root}/admin` : "/admin";
