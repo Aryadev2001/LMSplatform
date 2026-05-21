@@ -13,7 +13,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/db/client";
-import { tenants, programs, users } from "@/db/schema";
+import { tenants, programs, users, courseReviews } from "@/db/schema";
 
 /**
  * Cross-tenant marketplace reads for the public eurodigital.coach pages.
@@ -33,6 +33,9 @@ export interface MarketCourse {
   imageUrl: string | null;
   instituteName: string;
   instituteSlug: string;
+  /** Mean rating in [0,5]; 0 when no reviews — render as "no rating" not 0★. */
+  avgRating: number;
+  reviewCount: number;
 }
 
 export interface MarketInstitute {
@@ -175,6 +178,14 @@ export async function getMarketCourses(opts?: {
       imageUrl: programs.imageUrl,
       instituteName: tenants.name,
       instituteSlug: tenants.slug,
+      avgRating: sql<number>`coalesce((
+        select avg(rating)::float8 from ${courseReviews} cr
+        where cr.course_id = ${programs.id}
+      ), 0)`,
+      reviewCount: sql<number>`coalesce((
+        select count(*)::int from ${courseReviews} cr
+        where cr.course_id = ${programs.id}
+      ), 0)`,
     })
     .from(programs)
     .innerJoin(tenants, eq(tenants.id, programs.tenantId))
@@ -203,6 +214,14 @@ export async function getRelatedCourses(
       imageUrl: programs.imageUrl,
       instituteName: tenants.name,
       instituteSlug: tenants.slug,
+      avgRating: sql<number>`coalesce((
+        select avg(rating)::float8 from ${courseReviews} cr
+        where cr.course_id = ${programs.id}
+      ), 0)`,
+      reviewCount: sql<number>`coalesce((
+        select count(*)::int from ${courseReviews} cr
+        where cr.course_id = ${programs.id}
+      ), 0)`,
     })
     .from(programs)
     .innerJoin(tenants, eq(tenants.id, programs.tenantId))

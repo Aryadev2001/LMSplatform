@@ -1,6 +1,13 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { tenants, programs, users, courseOffers, modules } from "@/db/schema";
+import {
+  tenants,
+  programs,
+  users,
+  courseOffers,
+  modules,
+  courseReviews,
+} from "@/db/schema";
 
 /**
  * Generic per-tenant storefront data. Every institute gets the SAME layout —
@@ -23,6 +30,8 @@ export interface StorefrontCourse {
   language: "en" | "ar" | "hi";
   totalDurationHours: number;
   moduleCount: number;
+  avgRating: number;
+  reviewCount: number;
 }
 
 export interface Storefront {
@@ -109,6 +118,14 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
       moduleCount: sql<number>`(
         select count(*)::int from ${modules} m where m.course_id = ${programs.id}
       )`,
+      avgRating: sql<number>`coalesce((
+        select avg(rating)::float8 from ${courseReviews} cr
+        where cr.course_id = ${programs.id}
+      ), 0)`,
+      reviewCount: sql<number>`coalesce((
+        select count(*)::int from ${courseReviews} cr
+        where cr.course_id = ${programs.id}
+      ), 0)`,
     })
     .from(programs)
     .where(

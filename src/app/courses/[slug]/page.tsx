@@ -23,6 +23,7 @@ import { db } from "@/db/client";
 import { tenants, exams } from "@/db/schema";
 import { getCourseBySlug, formatRuntime } from "@/lib/courses";
 import { getRelatedCourses } from "@/lib/marketplace";
+import { getCourseRating, listCourseReviews } from "@/lib/reviews";
 import { formatCurrency } from "@/lib/format";
 import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
@@ -85,12 +86,14 @@ export default async function CourseDetailPage({
 
   if (!institute || institute.status === "SUSPENDED") notFound();
 
-  const [related, [examCountRow]] = await Promise.all([
+  const [related, [examCountRow], rating, reviews] = await Promise.all([
     getRelatedCourses(tenantId, course.id, 3),
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(exams)
       .where(and(eq(exams.programId, course.id), eq(exams.isActive, true))),
+    getCourseRating(course.id),
+    listCourseReviews(course.id, { limit: 8 }),
   ]);
   const examCount = examCountRow?.n ?? 0;
 
@@ -221,9 +224,15 @@ export default async function CourseDetailPage({
                 style={{ color: "var(--ed-blue)" }}
               >
                 <Building2 className="size-4" /> {institute.name}
-                <span className="inline-flex items-center gap-1" style={{ color: "var(--ed-warn)" }}>
-                  <Star className="size-3.5 fill-current" /> 4.8
-                </span>
+                {rating.count > 0 && (
+                  <span
+                    className="inline-flex items-center gap-1"
+                    style={{ color: "var(--ed-warn)" }}
+                  >
+                    <Star className="size-3.5 fill-current" /> {rating.avg.toFixed(1)}
+                    <span style={{ color: "var(--ed-mute)" }}>({rating.count})</span>
+                  </span>
+                )}
               </Link>
 
               <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: "var(--ed-mute)" }}>
@@ -557,17 +566,101 @@ export default async function CourseDetailPage({
             </div>
           </section>
 
-          {/* Reviews — honest state (no reviews model yet) */}
+          {/* Reviews — real list from course_reviews (0016) */}
           <section>
-            <h2 className="mb-3 text-xl font-extrabold tracking-tight" style={{ color: "var(--ed-ink)" }}>
-              Reviews
-            </h2>
-            <div
-              className="rounded-2xl border border-dashed py-10 text-center text-sm"
-              style={{ borderColor: "var(--ed-line)", color: "var(--ed-mute)" }}
-            >
-              No reviews yet — be the first to review after you complete this course.
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2
+                  className="text-xl font-extrabold tracking-tight"
+                  style={{ color: "var(--ed-ink)" }}
+                >
+                  Reviews
+                </h2>
+                {rating.count > 0 && (
+                  <div
+                    className="mt-1 text-sm font-semibold"
+                    style={{ color: "var(--ed-mute)" }}
+                  >
+                    {rating.avg.toFixed(1)} / 5 from {rating.count} review
+                    {rating.count === 1 ? "" : "s"}
+                  </div>
+                )}
+              </div>
+              {rating.count > 0 && (
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star
+                      key={n}
+                      className={`size-4 ${rating.avg >= n - 0.5 ? "fill-current" : ""}`}
+                      style={{
+                        color:
+                          rating.avg >= n - 0.5
+                            ? "var(--ed-warn)"
+                            : "var(--ed-line)",
+                      }}
+                      strokeWidth={1.5}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
+
+            {reviews.length === 0 ? (
+              <div
+                className="rounded-2xl border border-dashed py-10 text-center text-sm"
+                style={{ borderColor: "var(--ed-line)", color: "var(--ed-mute)" }}
+              >
+                No reviews yet — enrolled students can leave a review from
+                their course dashboard.
+              </div>
+            ) : (
+              <ul
+                className="divide-y rounded-2xl border bg-white"
+                style={{ borderColor: "var(--ed-line)" }}
+              >
+                {reviews.map((r) => (
+                  <li key={r.id} className="p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Star
+                            key={n}
+                            className={`size-3.5 ${r.rating >= n ? "fill-current" : ""}`}
+                            style={{
+                              color:
+                                r.rating >= n
+                                  ? "var(--ed-warn)"
+                                  : "var(--ed-line)",
+                            }}
+                            strokeWidth={1.5}
+                          />
+                        ))}
+                      </div>
+                      <span
+                        className="text-sm font-bold"
+                        style={{ color: "var(--ed-ink)" }}
+                      >
+                        {r.authorName ?? "Verified learner"}
+                      </span>
+                      <span
+                        className="text-[11px]"
+                        style={{ color: "var(--ed-mute)" }}
+                      >
+                        {r.createdAt.toISOString().slice(0, 10)}
+                      </span>
+                    </div>
+                    {r.body && (
+                      <p
+                        className="mt-2 whitespace-pre-line text-sm"
+                        style={{ color: "var(--ed-ink-2)" }}
+                      >
+                        {r.body}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {/* Disclaimer + T&C — surfaces course.disclaimer + course.termsHtml */}

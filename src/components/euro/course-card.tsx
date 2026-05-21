@@ -87,12 +87,21 @@ export function EuroCourseCard({ c }: { c: MarketCourse }) {
           className="mt-3 flex items-center justify-between border-t pt-3"
           style={{ borderColor: "var(--ed-line)" }}
         >
-          <span
-            className="flex items-center gap-1 text-xs font-medium"
-            style={{ color: "var(--ed-warn)" }}
-          >
-            <Star className="size-3.5 fill-current" /> 4.8
-          </span>
+          {c.reviewCount > 0 ? (
+            <span
+              className="flex items-center gap-1 text-xs font-medium"
+              style={{ color: "var(--ed-warn)" }}
+            >
+              <Star className="size-3.5 fill-current" /> {c.avgRating.toFixed(1)}
+              <span className="font-normal" style={{ color: "var(--ed-mute)" }}>
+                ({c.reviewCount})
+              </span>
+            </span>
+          ) : (
+            <span className="text-[11px]" style={{ color: "var(--ed-mute)" }}>
+              New course
+            </span>
+          )}
           <span
             className="text-base font-extrabold"
             style={{ color: "var(--ed-ink)" }}

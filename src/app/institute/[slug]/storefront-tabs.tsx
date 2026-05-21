@@ -10,6 +10,7 @@ import {
   Sparkles,
   ChevronDown,
   Filter,
+  Star,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import type { StorefrontCourse } from "@/lib/storefront";
@@ -26,6 +27,18 @@ interface StorefrontStats {
   learnerCount: number;
   sinceYear: number;
   activeOffers: number;
+  reviewCount: number;
+  avgRating: number;
+}
+
+export interface StorefrontReview {
+  id: string;
+  authorName: string;
+  rating: number;
+  body: string | null;
+  courseTitle: string;
+  courseSlug: string | null;
+  createdAt: string;
 }
 
 const TABS = [
@@ -65,6 +78,7 @@ export function StorefrontBody({
   owner,
   courses,
   stats,
+  reviews,
 }: {
   tenantName: string;
   heroTagline: string | null;
@@ -72,6 +86,7 @@ export function StorefrontBody({
   owner: OwnerSummary;
   courses: StorefrontCourse[];
   stats: StorefrontStats;
+  reviews: StorefrontReview[];
 }) {
   const [tab, setTab] = useState<Tab>("All Courses");
   const [sort, setSort] = useState<SortValue>("newest");
@@ -129,7 +144,9 @@ export function StorefrontBody({
               ? stats.courseCount
               : t === "Offers & Coupons"
                 ? stats.activeOffers
-                : null;
+                : t === "Reviews"
+                  ? stats.reviewCount
+                  : null;
           return (
             <button
               key={t}
@@ -238,14 +255,9 @@ export function StorefrontBody({
         </div>
       )}
 
-      {/* Reviews — honest empty (no reviews schema yet) */}
+      {/* Reviews */}
       {tab === "Reviews" && (
-        <div
-          className="rounded-2xl border border-dashed py-16 text-center text-sm"
-          style={{ borderColor: "var(--ed-line)", color: "var(--ed-mute)" }}
-        >
-          No reviews yet — learners can review after completing a course.
-        </div>
+        <ReviewsTab reviews={reviews} stats={stats} />
       )}
 
       {/* Instructors — populated from owner profile if present */}
@@ -406,6 +418,109 @@ function AboutTab({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function ReviewsTab({
+  reviews,
+  stats,
+}: {
+  reviews: StorefrontReview[];
+  stats: StorefrontStats;
+}) {
+  if (reviews.length === 0) {
+    return (
+      <div
+        className="rounded-2xl border border-dashed py-16 text-center text-sm"
+        style={{ borderColor: "var(--ed-line)", color: "var(--ed-mute)" }}
+      >
+        No reviews yet — enrolled students can leave a review from their
+        course dashboard.
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div
+        className="mb-6 flex items-center gap-4 rounded-2xl border bg-white p-5"
+        style={{ borderColor: "var(--ed-line)" }}
+      >
+        <div className="text-4xl font-extrabold tabular-nums" style={{ color: "var(--ed-ink)" }}>
+          {stats.avgRating.toFixed(1)}
+        </div>
+        <div>
+          <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <Star
+                key={n}
+                className={`size-4 ${stats.avgRating >= n - 0.5 ? "fill-current" : ""}`}
+                style={{
+                  color:
+                    stats.avgRating >= n - 0.5
+                      ? "var(--ed-warn, #F59E0B)"
+                      : "var(--ed-line)",
+                }}
+                strokeWidth={1.5}
+              />
+            ))}
+          </div>
+          <div
+            className="mt-1 text-xs font-semibold uppercase tracking-wider"
+            style={{ color: "var(--ed-mute)" }}
+          >
+            {stats.reviewCount} verified review
+            {stats.reviewCount === 1 ? "" : "s"}
+          </div>
+        </div>
+      </div>
+
+      <ul
+        className="divide-y rounded-2xl border bg-white"
+        style={{ borderColor: "var(--ed-line)" }}
+      >
+        {reviews.map((r) => (
+          <li key={r.id} className="p-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Star
+                    key={n}
+                    className={`size-3.5 ${r.rating >= n ? "fill-current" : ""}`}
+                    style={{
+                      color: r.rating >= n ? "var(--ed-warn, #F59E0B)" : "var(--ed-line)",
+                    }}
+                    strokeWidth={1.5}
+                  />
+                ))}
+              </div>
+              <span className="text-sm font-bold" style={{ color: "var(--ed-ink)" }}>
+                {r.authorName}
+              </span>
+              {r.courseSlug && (
+                <Link
+                  href={`/courses/${r.courseSlug}`}
+                  className="text-[11px] font-semibold underline-offset-2 hover:underline"
+                  style={{ color: "var(--brand-primary)" }}
+                >
+                  on {r.courseTitle}
+                </Link>
+              )}
+              <span className="text-[11px]" style={{ color: "var(--ed-mute)" }}>
+                {r.createdAt}
+              </span>
+            </div>
+            {r.body && (
+              <p
+                className="mt-2 whitespace-pre-line text-sm"
+                style={{ color: "var(--ed-ink-2)" }}
+              >
+                {r.body}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

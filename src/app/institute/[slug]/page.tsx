@@ -1,10 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
-import { BookOpen, Users, CalendarDays, Tag, GraduationCap, LogIn } from "lucide-react";
+import {
+  BookOpen,
+  Users,
+  CalendarDays,
+  Tag,
+  GraduationCap,
+  LogIn,
+  Star,
+} from "lucide-react";
 import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { getStorefront } from "@/lib/storefront";
+import { listTenantReviews } from "@/lib/reviews";
 import { StorefrontBody } from "./storefront-tabs";
 import { FollowShareInner } from "./follow-share";
 
@@ -43,6 +52,11 @@ export default async function InstituteStorefrontPage({
   if (!sf) notFound();
 
   const { tenant, courses } = sf;
+  const tenantReviews = await listTenantReviews(tenant.id, { limit: 20 });
+  const tenantAvgRating =
+    tenantReviews.length === 0
+      ? 0
+      : tenantReviews.reduce((s, r) => s + r.rating, 0) / tenantReviews.length;
   const primary = safeHex(tenant.brandPrimaryColor, "#1AADE0");
   const secondary = safeHex(tenant.brandSecondaryColor, "#8CC63F");
 
@@ -164,6 +178,13 @@ export default async function InstituteStorefrontPage({
                   active offer{activeOffers === 1 ? "" : "s"}
                 </span>
               )}
+              {tenantReviews.length > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Star className="size-3.5 fill-current" style={{ color: "#F5C740" }} />
+                  <span className="font-bold text-white">{tenantAvgRating.toFixed(1)}</span>
+                  <span>({tenantReviews.length} review{tenantReviews.length === 1 ? "" : "s"})</span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -203,7 +224,18 @@ export default async function InstituteStorefrontPage({
           learnerCount,
           sinceYear,
           activeOffers,
+          reviewCount: tenantReviews.length,
+          avgRating: tenantAvgRating,
         }}
+        reviews={tenantReviews.map((r) => ({
+          id: r.id,
+          authorName: r.authorName ?? "Verified learner",
+          rating: r.rating,
+          body: r.body,
+          courseTitle: r.courseTitle,
+          courseSlug: r.courseSlug,
+          createdAt: r.createdAt.toISOString().slice(0, 10),
+        }))}
       />
 
       {tenant.whiteLabel ? (

@@ -18,6 +18,8 @@ import { requireRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { getCourseBySlug } from "@/lib/courses";
 import { CoursePlayer } from "./course-player";
+import { ReviewForm } from "./review-form";
+import { getMyReview, getCourseRating, listCourseReviews } from "@/lib/reviews";
 import {
   Award,
   ClipboardList,
@@ -26,6 +28,7 @@ import {
   ArrowRight,
   CheckCircle2,
   XCircle,
+  Star,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -141,6 +144,14 @@ export default async function StudentCourseDeliveryPage({
     if (!inProgressByExam.has(a.examId)) inProgressByExam.set(a.examId, a.id);
   }
 
+  // Reviews — student's own review (for the form prefill) + aggregate +
+  // a small list of recent reviews from other learners.
+  const [myReview, rating, recentReviews] = await Promise.all([
+    getMyReview(me.id, course.id),
+    getCourseRating(course.id),
+    listCourseReviews(course.id, { limit: 6 }),
+  ]);
+
   const modulesForPlayer = modules.map((mod) => ({
     id: mod.id,
     title: mod.title,
@@ -203,6 +214,91 @@ export default async function StudentCourseDeliveryPage({
       )}
 
       <CoursePlayer slug={slug} modules={modulesForPlayer} locked={!enrolled} />
+
+      {/* Reviews — leave-your-review form (enrolled only) + public list. */}
+      <Card className="border-none bg-card p-6 shadow-card">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              — Reviews
+            </div>
+            <h2 className="mt-1 text-lg font-bold">
+              {rating.count === 0
+                ? "No reviews yet — be the first."
+                : `${rating.avg.toFixed(1)} / 5 from ${rating.count} review${rating.count === 1 ? "" : "s"}`}
+            </h2>
+          </div>
+          {rating.count > 0 && (
+            <div className="flex items-center gap-1.5">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Star
+                  key={n}
+                  className={`size-4 ${rating.avg >= n - 0.5 ? "fill-current" : ""}`}
+                  style={{
+                    color:
+                      rating.avg >= n - 0.5
+                        ? "#F59E0B"
+                        : "var(--ed-line, #E2E8F0)",
+                  }}
+                  strokeWidth={1.5}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {enrolled ? (
+          <div className="mb-6 rounded-xl border p-4">
+            <ReviewForm
+              courseId={course.id}
+              initial={
+                myReview
+                  ? { rating: myReview.rating, body: myReview.body ?? "" }
+                  : null
+              }
+            />
+          </div>
+        ) : (
+          <div className="mb-6 rounded-xl border border-dashed p-4 text-xs text-muted-foreground">
+            Enrol in this course to leave a review.
+          </div>
+        )}
+
+        {recentReviews.length > 0 && (
+          <ul className="divide-y">
+            {recentReviews.map((r) => (
+              <li key={r.id} className="py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Star
+                        key={n}
+                        className={`size-3.5 ${r.rating >= n ? "fill-current" : ""}`}
+                        style={{
+                          color:
+                            r.rating >= n ? "#F59E0B" : "var(--ed-line, #E2E8F0)",
+                        }}
+                        strokeWidth={1.5}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm font-semibold">
+                    {r.authorName ?? "Anonymous learner"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {r.createdAt.toISOString().slice(0, 10)}
+                  </span>
+                </div>
+                {r.body && (
+                  <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+                    {r.body}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {examRows.length > 0 && (
         <Card className="border-none bg-card p-6 shadow-card">
