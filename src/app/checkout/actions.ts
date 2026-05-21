@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { headers } from "next/headers";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -47,8 +48,26 @@ const DEFAULT_PLATFORM_FEE_BPS = 1500; // 15%
 const clampBps = (n: number | null | undefined) =>
   Math.min(5000, Math.max(0, n ?? DEFAULT_PLATFORM_FEE_BPS));
 
-const appBaseUrl = () =>
-  process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+/**
+ * Build the base URL for gateway return links from the *current* request,
+ * so a Stripe checkout started on student.<root> returns the buyer to
+ * student.<root> (not the apex). Falls back to NEXT_PUBLIC_APP_URL.
+ */
+async function appBaseUrl(): Promise<string> {
+  try {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (host) {
+      const proto =
+        h.get("x-forwarded-proto") ??
+        (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
+      return `${proto}://${host}`;
+    }
+  } catch {
+    /* headers() unavailable — fall through */
+  }
+  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+}
 
 interface CheckoutCtx {
   dbUser: { id: string; email: string; fullName: string | null };
@@ -353,7 +372,7 @@ export async function beginCheckout(input: unknown): Promise<BeginResult> {
 
   const orderId = await insertPendingOrder(ctx, gw.provider);
 
-  const base = appBaseUrl();
+  const base = await appBaseUrl();
   const charge = await createGatewayCharge(gw, {
     amountCents: chargeCents,
     currency: ctx.currency,
