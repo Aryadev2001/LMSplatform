@@ -1,15 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
-import { users, students, lessonProgress, enrollments } from "@/db/schema";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import {
+  users,
+  students,
+  lessonProgress,
+  enrollments,
+  exams,
+  examQuestions,
+  examAttempts,
+} from "@/db/schema";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { getCourseBySlug } from "@/lib/courses";
 import { CoursePlayer } from "./course-player";
-import { Award } from "lucide-react";
+import {
+  Award,
+  ClipboardList,
+  Clock,
+  Hash,
+  ArrowRight,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +79,67 @@ export default async function StudentCourseDeliveryPage({
     allLessonIds.length === 0
       ? 0
       : Math.round((doneSet.size / allLessonIds.length) * 100);
+
+  // Active exams for this course + the student's best attempt at each.
+  const examRows = await db
+    .select({
+      id: exams.id,
+      title: exams.title,
+      durationMinutes: exams.durationMinutes,
+      totalMarks: exams.totalMarks,
+      passingMarks: exams.passingMarks,
+      questionCount: sql<number>`(
+        select count(*)::int from ${examQuestions} q where q.exam_id = ${exams.id}
+      )`,
+    })
+    .from(exams)
+    .where(and(eq(exams.programId, course.id), eq(exams.isActive, true)))
+    .orderBy(desc(exams.createdAt));
+
+  const myAttempts = examRows.length
+    ? await db
+        .select({
+          examId: examAttempts.examId,
+          id: examAttempts.id,
+          score: examAttempts.score,
+          maxScore: examAttempts.maxScore,
+          passed: examAttempts.passed,
+          submittedAt: examAttempts.submittedAt,
+        })
+        .from(examAttempts)
+        .where(
+          and(
+            eq(examAttempts.userId, me.id),
+            inArray(
+              examAttempts.examId,
+              examRows.map((e) => e.id),
+            ),
+          ),
+        )
+        .orderBy(desc(examAttempts.startedAt))
+    : [];
+  const bestByExam = new Map<
+    string,
+    { id: string; score: number | null; maxScore: number | null; passed: boolean | null; submittedAt: Date | null }
+  >();
+  for (const a of myAttempts) {
+    if (!a.submittedAt) continue;
+    const prev = bestByExam.get(a.examId);
+    if (!prev || (a.score ?? -1) > (prev.score ?? -1)) {
+      bestByExam.set(a.examId, {
+        id: a.id,
+        score: a.score,
+        maxScore: a.maxScore,
+        passed: a.passed,
+        submittedAt: a.submittedAt,
+      });
+    }
+  }
+  const inProgressByExam = new Map<string, string>();
+  for (const a of myAttempts) {
+    if (a.submittedAt) continue;
+    if (!inProgressByExam.has(a.examId)) inProgressByExam.set(a.examId, a.id);
+  }
 
   const modulesForPlayer = modules.map((mod) => ({
     id: mod.id,
@@ -125,6 +203,92 @@ export default async function StudentCourseDeliveryPage({
       )}
 
       <CoursePlayer slug={slug} modules={modulesForPlayer} locked={!enrolled} />
+
+      {examRows.length > 0 && (
+        <Card className="border-none bg-card p-6 shadow-card">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                — Assessments
+              </div>
+              <h2 className="mt-1 text-lg font-bold">
+                Exams ({examRows.length})
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Pass to validate your learning — best attempt counts.
+              </p>
+            </div>
+          </div>
+
+          <ul className="divide-y">
+            {examRows.map((ex) => {
+              const best = bestByExam.get(ex.id);
+              const inProgressId = inProgressByExam.get(ex.id);
+              return (
+                <li
+                  key={ex.id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3 sm:flex-nowrap"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold">{ex.title}</span>
+                      {best?.passed === true && (
+                        <Badge variant="default" className="font-normal">
+                          <CheckCircle2 className="size-3" /> Passed
+                        </Badge>
+                      )}
+                      {best && best.passed === false && (
+                        <Badge variant="destructive" className="font-normal">
+                          <XCircle className="size-3" /> Not passed
+                        </Badge>
+                      )}
+                      {inProgressId && (
+                        <Badge variant="secondary" className="font-normal">
+                          In progress
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <ClipboardList className="size-3" />
+                        {ex.questionCount} q
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="size-3" />
+                        {ex.durationMinutes} min
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Hash className="size-3" />
+                        {ex.totalMarks} marks · pass {ex.passingMarks}
+                      </span>
+                      {best && (
+                        <span className="font-semibold text-foreground">
+                          Best {best.score}/{best.maxScore}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Link
+                    href={
+                      inProgressId
+                        ? `/student/exams/attempts/${inProgressId}/take`
+                        : `/student/exams/${ex.id}`
+                    }
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-foreground px-3 text-xs font-bold text-background transition-opacity hover:opacity-90"
+                  >
+                    {inProgressId
+                      ? "Resume"
+                      : best
+                        ? "Retake"
+                        : "Take exam"}
+                    <ArrowRight className="size-3.5" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }

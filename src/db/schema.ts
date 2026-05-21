@@ -471,6 +471,44 @@ export const examQuestions = pgTable(
   ],
 );
 
+// ---------- Exam attempts (0015) — student submissions + scoring ----------
+export const examAttempts = pgTable(
+  "exam_attempts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    examId: uuid("exam_id")
+      .notNull()
+      .references(() => exams.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    enrollmentId: uuid("enrollment_id").references(() => enrollments.id, {
+      onDelete: "set null",
+    }),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    /** Map of questionId → optionIndex (the student's pick). */
+    answers: jsonb("answers").notNull().default(sql`'{}'::jsonb`),
+    /** Null while in progress; computed at submit. */
+    score: integer("score"),
+    /** Snapshot of exam.totalMarks at submit time — preserves history if
+     *  the exam is edited later. */
+    maxScore: integer("max_score"),
+    passingMarks: integer("passing_marks"),
+    passed: boolean("passed"),
+  },
+  (t) => [
+    index("exam_attempts_user_idx").on(t.userId),
+    index("exam_attempts_exam_idx").on(t.examId),
+    index("exam_attempts_tenant_idx").on(t.tenantId),
+  ],
+);
+
 // ---------- Course offers / vouchers (0013) ----------
 export const courseOffers = pgTable(
   "course_offers",
