@@ -56,24 +56,51 @@ export function AlreadySignedIn({
         </div>
       </div>
 
+      {/* CTAs — Sign Out is the primary button when on /sign-up so users
+          who came here to create a new account don't accidentally
+          continue an existing session. On /sign-in Continue stays primary. */}
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-        <Link
-          href={dashboardHref}
-          className="inline-flex flex-1 items-center justify-center rounded-xl px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
-          style={{ background: "var(--ed-gradient)" }}
-        >
-          {dashboardLabel}
-        </Link>
-        <SignOutButton redirectUrl={context === "sign-in" ? "/sign-in" : "/sign-up"}>
-          <button
-            type="button"
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-bold transition-colors hover:bg-[var(--ed-bg)]"
-            style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink)" }}
-          >
-            <LogOut className="size-4" />
-            Sign out & stay here
-          </button>
-        </SignOutButton>
+        {context === "sign-up" ? (
+          <>
+            <SignOutButton redirectUrl="/sign-up">
+              <button
+                type="button"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                style={{ background: "var(--ed-gradient)" }}
+              >
+                <LogOut className="size-4" />
+                Sign out & sign up fresh
+              </button>
+            </SignOutButton>
+            <Link
+              href={dashboardHref}
+              className="inline-flex flex-1 items-center justify-center rounded-xl border px-5 py-3 text-sm font-bold transition-colors hover:bg-[var(--ed-bg)]"
+              style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink)" }}
+            >
+              {dashboardLabel}
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              href={dashboardHref}
+              className="inline-flex flex-1 items-center justify-center rounded-xl px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+              style={{ background: "var(--ed-gradient)" }}
+            >
+              {dashboardLabel}
+            </Link>
+            <SignOutButton redirectUrl="/sign-in">
+              <button
+                type="button"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-bold transition-colors hover:bg-[var(--ed-bg)]"
+                style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink)" }}
+              >
+                <LogOut className="size-4" />
+                Sign out & stay here
+              </button>
+            </SignOutButton>
+          </>
+        )}
       </div>
 
       <div

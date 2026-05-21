@@ -11,7 +11,10 @@ import {
   CreditCard,
   Coins,
   Gift,
+  UserSquare2,
+  LogOut,
 } from "lucide-react";
+import { SignOutButton } from "@clerk/nextjs";
 import { useWishlist } from "@/lib/wishlist";
 
 interface NavItem {
@@ -24,12 +27,14 @@ interface NavItem {
 
 export function StudentSidebar({
   name,
+  email,
   studentCode,
   points,
   activeCourses,
   completed,
 }: {
   name: string;
+  email: string;
   studentCode: string;
   points: number;
   activeCourses: number;
@@ -115,11 +120,45 @@ export function StudentSidebar({
             {initials}
           </span>
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold text-white">{name}</div>
-            <div className="truncate text-[11px] text-white/45">
+            <div className="truncate text-sm font-bold text-white" title={name}>
+              {name}
+            </div>
+            {/* Email is always shown so it's obvious which account you're
+                 looking at — prevents the "wrong session" confusion when
+                 signing up multiple test accounts in the same browser. */}
+            <div className="truncate text-[11px] text-white/55" title={email}>
+              {email}
+            </div>
+            <div className="truncate text-[10px] text-white/35">
               Student · {studentCode}
             </div>
           </div>
+        </div>
+
+        {/* Account controls */}
+        <div className="mt-3 flex gap-1">
+          <Link
+            href="/student/profile"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-colors hover:bg-white/10"
+            style={{
+              border: "1px solid rgba(255,255,255,0.10)",
+              color: "rgba(255,255,255,0.7)",
+            }}
+          >
+            <UserSquare2 className="size-3.5" /> Profile
+          </Link>
+          <SignOutButton redirectUrl="/sign-in">
+            <button
+              type="button"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-colors hover:bg-white/10"
+              style={{
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "rgba(255,255,255,0.7)",
+              }}
+            >
+              <LogOut className="size-3.5" /> Sign out
+            </button>
+          </SignOutButton>
         </div>
 
         <div

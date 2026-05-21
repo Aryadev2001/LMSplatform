@@ -47,6 +47,7 @@ export default async function StudentLayout({
     >
       <StudentSidebar
         name={snap.fullName}
+        email={snap.email}
         studentCode={snap.studentCode}
         points={snap.pointsBalance}
         activeCourses={snap.counts.activeCourses}
