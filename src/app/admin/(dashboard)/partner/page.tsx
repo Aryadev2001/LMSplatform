@@ -41,6 +41,7 @@ export default async function PartnerOverviewPage({
   const [row] = await db
     .select({
       name: tenants.name,
+      slug: tenants.slug,
       logoUrl: tenants.logoUrl,
       tier: tenants.tier,
       billingStatus: tenants.billingStatus,
@@ -278,13 +279,17 @@ export default async function PartnerOverviewPage({
                 {row?.ownerName ? `Led by ${row.ownerName}` : "Owner not set"}
               </div>
             </div>
-            <Link
-              href={`/institute/${tenantId}`}
-              className="hidden text-xs font-semibold underline-offset-2 hover:underline sm:inline"
-              style={{ color: "var(--ed-blue)" }}
-            >
-              View public page →
-            </Link>
+            {row?.slug && (
+              <Link
+                href={`/institute/${row.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden text-xs font-semibold underline-offset-2 hover:underline sm:inline"
+                style={{ color: "var(--ed-blue)" }}
+              >
+                View public page →
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>

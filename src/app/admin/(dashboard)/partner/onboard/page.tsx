@@ -1,10 +1,14 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { tenants } from "@/db/schema";
+import { tenants, programs, modules } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { OnboardingWizard, type InitialOnboardingData } from "./wizard";
+import {
+  OnboardingWizard,
+  type InitialOnboardingData,
+  type CourseSummary,
+} from "./wizard";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +45,32 @@ function pickSocials(raw: unknown): Socials {
 export default async function OnboardPage() {
   await requireRole("admin");
   const tenantId = await requireTenantId();
+
+  const courseRows = await db
+    .select({
+      id: programs.id,
+      name: programs.name,
+      priceCents: programs.priceCents,
+      currency: programs.currency,
+      isActive: programs.isActive,
+      imageUrl: programs.imageUrl,
+      moduleCount: sql<number>`(
+        select count(*)::int from ${modules} m where m.course_id = ${programs.id}
+      )`,
+    })
+    .from(programs)
+    .where(eq(programs.tenantId, tenantId))
+    .orderBy(desc(programs.createdAt));
+
+  const courses: CourseSummary[] = courseRows.map((c) => ({
+    id: c.id,
+    name: c.name,
+    priceCents: c.priceCents,
+    currency: c.currency,
+    isActive: c.isActive,
+    imageUrl: c.imageUrl,
+    moduleCount: c.moduleCount,
+  }));
 
   const [row] = await db
     .select({
@@ -100,6 +130,7 @@ export default async function OnboardPage() {
       profile: row?.ownerProfile ?? "",
       socials: pickSocials(row?.ownerSocials),
     },
+    courses,
   };
 
   return (

@@ -13,12 +13,17 @@ import {
   UserSquare2,
   FileCheck2,
   Loader2,
+  BookOpen,
+  Video,
+  ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "@/components/file-upload";
+import { ProgramDialog } from "../../programs/program-dialog";
+import { formatCurrency } from "@/lib/format";
 import {
   saveBusinessStep,
   saveBrandingStep,
@@ -74,17 +79,29 @@ interface OwnerState {
   socials: Socials;
 }
 
+export interface CourseSummary {
+  id: string;
+  name: string;
+  priceCents: number;
+  currency: string;
+  isActive: boolean;
+  imageUrl: string | null;
+  moduleCount: number;
+}
+
 export interface InitialOnboardingData {
   business: BusinessState;
   branding: BrandingState;
   owner: OwnerState;
+  courses: CourseSummary[];
 }
 
 const STEPS = [
   { id: 0, label: "Business", icon: Building2 },
   { id: 1, label: "Branding", icon: Megaphone },
   { id: 2, label: "Owner", icon: UserSquare2 },
-  { id: 3, label: "Review", icon: FileCheck2 },
+  { id: 3, label: "Courses", icon: BookOpen },
+  { id: 4, label: "Review", icon: FileCheck2 },
 ] as const;
 
 const REVENUE_RANGES = [
@@ -175,6 +192,9 @@ export function OnboardingWizard({ initial }: { initial: InitialOnboardingData }
         setStep(3);
       });
     } else if (step === 3) {
+      // Courses step has its own per-course save — no aggregate save here.
+      setStep(4);
+    } else if (step === 4) {
       startTransition(async () => {
         const r = await finalizeOnboarding();
         if (!r.success) {
@@ -537,8 +557,15 @@ export function OnboardingWizard({ initial }: { initial: InitialOnboardingData }
           </div>
         )}
 
-        {step === 3 && (
-          <ReviewStep business={business} branding={branding} owner={owner} />
+        {step === 3 && <CoursesStep courses={initial.courses} />}
+
+        {step === 4 && (
+          <ReviewStep
+            business={business}
+            branding={branding}
+            owner={owner}
+            courses={initial.courses}
+          />
         )}
       </div>
 
@@ -593,14 +620,106 @@ function Row({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+function CoursesStep({ courses }: { courses: CourseSummary[] }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-bold">Your courses</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Create one or more courses, then open each to add modules, videos,
+          exams, certificates, and offers. Free courses are fine — you can
+          mix free and paid in the same catalog.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <ProgramDialog mode="create" />
+        <Link
+          href="/admin/programs"
+          className="inline-flex h-10 items-center gap-1.5 rounded-xl border px-4 text-xs font-semibold transition-colors hover:bg-secondary"
+        >
+          Open the course manager
+          <ArrowUpRight className="size-3.5" />
+        </Link>
+      </div>
+
+      {courses.length === 0 ? (
+        <div className="rounded-2xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+          No courses yet. Click <strong>+ New program</strong> above to create
+          your first one — you can come back and add more anytime.
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {courses.map((c) => (
+            <li
+              key={c.id}
+              className="flex items-center gap-4 rounded-2xl border bg-white p-4"
+            >
+              <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-secondary/40">
+                {c.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.imageUrl}
+                    alt={c.name}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <BookOpen className="size-5 text-muted-foreground" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-bold">{c.name}</span>
+                  {!c.isActive && (
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Inactive
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">
+                    {c.priceCents === 0
+                      ? "Free"
+                      : formatCurrency(c.priceCents, c.currency)}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Video className="size-3.5" />
+                    {c.moduleCount} module{c.moduleCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+              </div>
+              <Link
+                href={`/admin/programs/${c.id}`}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors hover:bg-secondary"
+              >
+                Manage modules &amp; videos
+                <ArrowUpRight className="size-3.5" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="rounded-xl border border-dashed p-3 text-[11px] leading-relaxed text-muted-foreground">
+        Each course supports modules with their own intro video, video lessons,
+        downloadable resources, an exam Q-bank, and a completion certificate
+        template. Use <strong>Manage modules &amp; videos</strong> on a course
+        row to open the full editor.
+      </div>
+    </div>
+  );
+}
+
 function ReviewStep({
   business,
   branding,
   owner,
+  courses,
 }: {
   business: BusinessState;
   branding: BrandingState;
   owner: OwnerState;
+  courses: CourseSummary[];
 }) {
   const fullAddress = [
     business.addressLine1,
@@ -684,6 +803,34 @@ function ReviewStep({
           <Row label="Title" value={owner.title || null} />
           <Row label="Profile" value={owner.profile || null} />
           <Row label="Social links" value={ownerSocialsList || null} />
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Courses
+        </h3>
+        <div className="rounded-xl border">
+          <Row
+            label="Total courses"
+            value={courses.length === 0 ? null : String(courses.length)}
+          />
+          <Row
+            label="With modules"
+            value={
+              courses.some((c) => c.moduleCount > 0)
+                ? String(courses.filter((c) => c.moduleCount > 0).length)
+                : null
+            }
+          />
+          <Row
+            label="Active courses"
+            value={
+              courses.some((c) => c.isActive)
+                ? String(courses.filter((c) => c.isActive).length)
+                : null
+            }
+          />
         </div>
       </section>
     </div>

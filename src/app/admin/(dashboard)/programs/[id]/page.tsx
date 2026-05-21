@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
-import { requireTier } from "@/lib/tier-lock";
 import { formatInr } from "@/lib/courses";
 import { ModuleDialog, DeleteModuleButton, DeleteLessonButton } from "./module-dialog";
 import { LessonDialog } from "./lesson-dialog";
@@ -24,7 +23,6 @@ export default async function CourseContentPage({
   params: Promise<{ id: string }>;
 }) {
   await requireRole("admin");
-  await requireTier("standard", "Courses");
   const { id } = await params;
   const tenantId = await requireTenantId();
 

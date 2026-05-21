@@ -73,15 +73,17 @@ export async function requireTier(
   }
 }
 
-/** Per-route minimum tier (matches NAV_ITEMS keys, for the sidebar lock UI). */
+/** Per-route minimum tier (matches NAV_ITEMS keys, for the sidebar lock UI).
+ *  Basic now gets the full publishing toolkit per the registration spec —
+ *  only AI Services and Diagnostics are paid-tier features. */
 export const ROUTE_MIN_TIER: Record<string, PartnerTier> = {
   "/admin": "basic",
   "/admin/partner": "basic",
   "/admin/students": "basic",
   "/admin/settings": "basic",
-  "/admin/programs": "standard",
-  "/admin/enrollments": "standard",
-  "/admin/payments": "standard",
+  "/admin/programs": "basic",
+  "/admin/enrollments": "basic",
+  "/admin/payments": "basic",
   "/admin/ai-services": "premium",
   "/admin/diagnostics": "premium",
 };

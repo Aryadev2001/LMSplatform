@@ -147,14 +147,22 @@ export default async function TenantDetailPage({
       <PageHeader
         eyebrow={`/${t.slug}`}
         title={t.name}
-        description={`Created ${t.createdAt.toISOString().slice(0, 10)} · ${uc?.n ?? 0} users · ${cc?.n ?? 0} courses`}
+        description={`Created ${t.createdAt.toISOString().slice(0, 10)} · ${uc?.n ?? 0} users · ${cc?.n ?? 0} courses · tier ${t.tier}`}
         actions={
           <div className="flex items-center gap-3">
             <Badge variant="outline">{t.status}</Badge>
+            <Badge variant="secondary" className="capitalize">
+              {t.tier}
+            </Badge>
             <OpenAsTenantButton tenantId={t.id} disabled={!writable} />
           </div>
         }
       />
+
+      {/* Partner registration details — everything the partner filled in
+          on /admin/partner/onboard, visible to super-admins for vetting. */}
+      <PartnerRegistrationCard tenant={t} />
+
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -372,3 +380,204 @@ export default async function TenantDetailPage({
     </div>
   );
 }
+
+interface RegistrationCardProps {
+  tenant: typeof tenants.$inferSelect;
+}
+
+type SocialMap = {
+  website?: string;
+  linkedin?: string;
+  twitter?: string;
+  instagram?: string;
+  facebook?: string;
+  youtube?: string;
+};
+
+function PartnerRegistrationCard({ tenant: t }: RegistrationCardProps) {
+  const fin = (t.businessFinancialInfo ?? {}) as {
+    annualRevenueRange?: string | null;
+    taxId?: string | null;
+    bankReference?: string | null;
+  };
+  const companySocials = (t.companySocials ?? {}) as SocialMap;
+  const ownerSocials = (t.ownerSocials ?? {}) as SocialMap;
+  const address = [
+    t.businessAddressLine1,
+    t.businessAddressLine2,
+    [t.businessCity, t.businessState, t.businessPostalCode]
+      .filter(Boolean)
+      .join(", "),
+    t.businessCountry,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const hasAnything =
+    t.businessLegalName ||
+    t.businessAddressLine1 ||
+    t.companyProfile ||
+    t.ownerName ||
+    t.businessRegDocUrl;
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="text-sm">Partner registration</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!hasAnything ? (
+          <p className="text-xs text-muted-foreground">
+            The partner hasn&apos;t filled in their registration form yet.
+            They do this from /admin/partner/onboard.
+          </p>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-3">
+            <RegSection title="Business">
+              <RegRow label="Legal name" value={t.businessLegalName} />
+              <RegRow label="Reg #" value={t.businessRegNumber} />
+              <RegRow
+                label="Reg doc"
+                link={t.businessRegDocUrl}
+                value={t.businessRegDocUrl ? "View document" : null}
+              />
+              <RegRow label="Address" value={address || null} />
+              <RegRow label="Phone" value={t.businessPhone} />
+              <RegRow label="Revenue range" value={fin.annualRevenueRange ?? null} />
+              <RegRow label="Tax ID" value={fin.taxId ?? null} />
+              <RegRow label="Bank ref" value={fin.bankReference ?? null} />
+            </RegSection>
+
+            <RegSection title="Branding">
+              <RegRow
+                label="Logo"
+                link={t.logoUrl}
+                value={t.logoUrl ? "View logo" : null}
+              />
+              <RegRow label="Primary color" value={t.brandPrimaryColor} />
+              <RegRow label="Secondary color" value={t.brandSecondaryColor} />
+              <RegRow label="Hero tagline" value={t.heroTagline} />
+              <RegRow
+                label="Company profile"
+                value={t.companyProfile ?? null}
+                multiline
+              />
+              <RegRow
+                label="Website"
+                link={companySocials.website}
+                value={companySocials.website ?? null}
+              />
+              <RegRow
+                label="LinkedIn"
+                link={companySocials.linkedin}
+                value={companySocials.linkedin ?? null}
+              />
+              <RegRow
+                label="Other socials"
+                value={
+                  [
+                    companySocials.twitter && "X",
+                    companySocials.instagram && "Instagram",
+                    companySocials.facebook && "Facebook",
+                    companySocials.youtube && "YouTube",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || null
+                }
+              />
+            </RegSection>
+
+            <RegSection title="Owner">
+              <RegRow
+                label="Photo"
+                link={t.ownerPhotoUrl}
+                value={t.ownerPhotoUrl ? "View photo" : null}
+              />
+              <RegRow label="Name" value={t.ownerName} />
+              <RegRow label="Title" value={t.ownerTitle} />
+              <RegRow
+                label="Profile"
+                value={t.ownerProfile ?? null}
+                multiline
+              />
+              <RegRow
+                label="LinkedIn"
+                link={ownerSocials.linkedin}
+                value={ownerSocials.linkedin ?? null}
+              />
+              <RegRow
+                label="Other socials"
+                value={
+                  [
+                    ownerSocials.twitter && "X",
+                    ownerSocials.instagram && "Instagram",
+                    ownerSocials.facebook && "Facebook",
+                    ownerSocials.youtube && "YouTube",
+                    ownerSocials.website && "Website",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || null
+                }
+              />
+            </RegSection>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RegSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+        {title}
+      </div>
+      <dl className="space-y-1.5 text-sm">{children}</dl>
+    </div>
+  );
+}
+
+function RegRow({
+  label,
+  value,
+  link,
+  multiline,
+}: {
+  label: string;
+  value: string | null | undefined;
+  link?: string | null;
+  multiline?: boolean;
+}) {
+  const has = !!value;
+  return (
+    <div className="grid grid-cols-[110px_1fr] gap-2 border-b py-1 last:border-b-0">
+      <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </dt>
+      <dd
+        className={`break-words text-xs ${has ? "text-foreground" : "text-muted-foreground"} ${multiline ? "whitespace-pre-wrap" : ""}`}
+      >
+        {has && link ? (
+          <a
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium underline-offset-2 hover:underline"
+          >
+            {value}
+          </a>
+        ) : (
+          value || "—"
+        )}
+      </dd>
+    </div>
+  );
+}
+

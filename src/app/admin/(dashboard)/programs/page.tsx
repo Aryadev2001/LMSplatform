@@ -3,7 +3,6 @@ import { db } from "@/db/client";
 import { programs } from "@/db/schema";
 import { and, eq, desc, ilike } from "drizzle-orm";
 import { requireTenantId } from "@/lib/tenant";
-import { requireTier } from "@/lib/tier-lock";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { Card } from "@/components/ui/card";
@@ -28,7 +27,6 @@ export default async function AdminProgramsPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  await requireTier("standard", "Courses");
   const tenantId = await requireTenantId();
   const search = q?.trim();
   const rows = await db

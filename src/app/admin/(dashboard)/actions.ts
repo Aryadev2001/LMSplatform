@@ -57,25 +57,13 @@ const ProgramSchema = z.object({
 
 export type ProgramResult = { success: true; id: string } | { success: false; error: string };
 
-/** Basic-tier partners can only publish FREE courses. Paid courses unlock
- *  at the Standard tier and above. */
+/** Basic partners can publish paid courses per the registration spec —
+ *  this gate is intentionally a no-op so we keep the call sites' shape
+ *  in case future tiers reintroduce a pricing-restricted plan. */
 async function assertPriceAllowed(
-  tenantId: string,
-  priceCents: number,
+  _tenantId: string,
+  _priceCents: number,
 ): Promise<ProgramResult | null> {
-  if (priceCents === 0) return null;
-  const [t] = await db
-    .select({ tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.id, tenantId))
-    .limit(1);
-  if (t?.tier === "basic") {
-    return {
-      success: false,
-      error:
-        "Paid courses are a Standard / Premium feature. Upgrade your partner plan at /admin/partner/billing — Basic supports free courses only.",
-    };
-  }
   return null;
 }
 
