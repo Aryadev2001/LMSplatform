@@ -81,9 +81,11 @@ export default async function ExplorePage({
     level?: string;
     price?: string;
     duration?: string;
+    welcome?: string;
   }>;
 }) {
   const sp = await searchParams;
+  const isWelcome = sp.welcome === "1";
   const levels = parseMulti<CourseLevel>(sp.level, LEVEL_VALUES);
   const prices = parseMulti<CoursePriceBucket>(sp.price, PRICE_VALUES);
   const durations = parseMulti<CourseDurationBucket>(sp.duration, DURATION_VALUES);
@@ -146,6 +148,41 @@ export default async function ExplorePage({
   return (
     <div style={{ background: "var(--ed-bg)" }} className="min-h-screen">
       <EuroNav />
+
+      {isWelcome && (
+        <section
+          className="border-b"
+          style={{
+            borderColor: "var(--ed-line)",
+            background:
+              "linear-gradient(135deg, rgba(141,198,63,0.10) 0%, rgba(0,174,239,0.10) 100%)",
+          }}
+        >
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div
+                className="text-[10px] font-extrabold uppercase tracking-widest"
+                style={{ color: "var(--ed-green-dark, #4f7f1c)" }}
+              >
+                ✓ Profile complete — last step
+              </div>
+              <div
+                className="mt-1 text-sm font-bold"
+                style={{ color: "var(--ed-ink)" }}
+              >
+                Pick your first course to unlock the learner dashboard.
+              </div>
+              <p
+                className="mt-0.5 text-xs"
+                style={{ color: "var(--ed-ink-2)" }}
+              >
+                Browse below, enrol in any course, and your full dashboard
+                (My Courses, Reviews, Certificates) opens up automatically.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section
         className="relative overflow-hidden border-b"

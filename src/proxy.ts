@@ -53,6 +53,10 @@ export default clerkMiddleware(async (auth, req) => {
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set(TENANT_SLUG_HEADER, slug);
     requestHeaders.set(TENANT_DOMAIN_HEADER, domain);
+    // Forward the route's pathname so server components / layouts can do
+    // path-conditional logic (e.g. skipping a layout-level redirect for a
+    // specific child route) without their own URL parser.
+    requestHeaders.set("x-pathname", req.nextUrl.pathname);
     return NextResponse.next({ request: { headers: requestHeaders } });
   };
 

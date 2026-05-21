@@ -116,17 +116,30 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
         {role === "learner" ? (
           <div>
             <div
-              className="mb-5 rounded-xl border px-4 py-3 text-[12px]"
+              className="mb-5 rounded-xl border px-4 py-3 text-[12px] leading-relaxed"
               style={{
                 borderColor: "var(--ed-line)",
                 background: "rgba(141,198,63,0.08)",
                 color: "var(--ed-ink-2)",
               }}
             >
-              You&apos;re signing up as a <strong>Learner</strong>. After
-              your magic-link verifies you&apos;ll complete a short profile
-              (mobile, T&amp;C consent, optional professional info) before
-              you can enrol in a paid course.
+              <strong>How it works:</strong>
+              <ol className="mt-1.5 list-decimal space-y-0.5 pl-4">
+                <li>
+                  Sign up with your email (we&apos;ll send a magic-link).
+                </li>
+                <li>
+                  Complete your <strong>learner profile</strong> — mobile,
+                  T&amp;C consent, optional professional info.
+                </li>
+                <li>
+                  <strong>Enrol in a course</strong> from the marketplace.
+                </li>
+                <li>
+                  Your <strong>dashboard unlocks</strong> automatically once
+                  you&apos;ve enrolled.
+                </li>
+              </ol>
             </div>
             <div className="euro-clerk">
               <SignUp
