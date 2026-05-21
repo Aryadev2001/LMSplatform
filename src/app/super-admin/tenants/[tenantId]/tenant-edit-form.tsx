@@ -19,6 +19,30 @@ import { updateTenant } from "../../actions";
 
 type Status = "ACTIVE" | "SUSPENDED" | "TRIAL" | "CHURNED";
 type Tier = "basic" | "standard" | "premium";
+type FeatureKey = "ai_services" | "diagnostics" | "white_label";
+type OverrideState = "default" | "granted" | "revoked";
+
+const FEATURE_INFO: Record<
+  FeatureKey,
+  { label: string; description: string; defaultTier: Tier }
+> = {
+  ai_services: {
+    label: "AI Services",
+    description: "Sell AI subscriptions to enrolled students.",
+    defaultTier: "premium",
+  },
+  diagnostics: {
+    label: "Diagnostics",
+    description: "Business X-Ray diagnostics for the tenant's students.",
+    defaultTier: "premium",
+  },
+  white_label: {
+    label: "White-label storefront",
+    description:
+      "Hides the eurodigital.coach platform nav / footer on /institute/<slug>.",
+    defaultTier: "premium",
+  },
+};
 
 interface Props {
   writable: boolean;
@@ -35,13 +59,31 @@ interface Props {
     referralPointsPercent: number;
     referralRedeemMaxPercent: number;
     platformFeeBps: number;
+    hidePlatformLogo: boolean;
+    featureOverrides: Partial<Record<FeatureKey, boolean>>;
   };
+}
+
+function overrideStateFor(v: boolean | undefined): OverrideState {
+  if (v === true) return "granted";
+  if (v === false) return "revoked";
+  return "default";
 }
 
 export function TenantEditForm({ writable, tenant }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [f, setF] = useState(tenant);
+
+  function setOverride(key: FeatureKey, state: OverrideState) {
+    setF((prev) => {
+      const next = { ...prev.featureOverrides };
+      if (state === "granted") next[key] = true;
+      else if (state === "revoked") next[key] = false;
+      else delete next[key];
+      return { ...prev, featureOverrides: next };
+    });
+  }
 
   function set<K extends keyof typeof f>(k: K, v: (typeof f)[K]) {
     setF((prev) => ({ ...prev, [k]: v }));
@@ -61,6 +103,8 @@ export function TenantEditForm({ writable, tenant }: Props) {
         referralPointsPercent: f.referralPointsPercent,
         referralRedeemMaxPercent: f.referralRedeemMaxPercent,
         platformFeePercent: f.platformFeeBps / 100,
+        hidePlatformLogo: f.hidePlatformLogo,
+        featureOverrides: f.featureOverrides,
       });
       if (r.success) {
         toast.success("Tenant updated");
@@ -249,6 +293,92 @@ export function TenantEditForm({ writable, tenant }: Props) {
             Taken from each sale; the institute is paid out the remainder.
             Platform-managed — the institute cannot change this.
           </p>
+        </div>
+      </div>
+
+      {/* Feature overrides — per-feature grant / revoke that beats the tier */}
+      <div className="rounded-xl border border-black/5 p-4">
+        <Label className="text-sm font-medium">Feature access</Label>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Each feature defaults to whichever tier requires it. Use{" "}
+          <strong>Grant</strong> to enable a feature without bumping the tier
+          (comp / pilot), or <strong>Revoke</strong> to explicitly disable a
+          feature even if the tier would normally allow it.
+        </p>
+
+        <div className="mt-4 space-y-3">
+          {(Object.keys(FEATURE_INFO) as FeatureKey[]).map((key) => {
+            const info = FEATURE_INFO[key];
+            const explicit = f.featureOverrides[key];
+            const stateValue = overrideStateFor(explicit);
+            const effective =
+              explicit === true
+                ? true
+                : explicit === false
+                  ? false
+                  : (f.tier === "premium" && info.defaultTier === "premium") ||
+                    (f.tier === "standard" && info.defaultTier === "standard") ||
+                    (f.tier === "basic" && info.defaultTier === "basic");
+
+            return (
+              <div
+                key={key}
+                className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-lg border border-black/5 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <span>{info.label}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        effective
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {effective ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {info.description} · Default tier:{" "}
+                    <span className="font-mono">{info.defaultTier}</span>
+                  </p>
+                </div>
+                <Select
+                  value={stateValue}
+                  onValueChange={(v) =>
+                    v && setOverride(key, v as OverrideState)
+                  }
+                  disabled={disabled}
+                >
+                  <SelectTrigger className="h-9 w-36 rounded-lg text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Use tier default</SelectItem>
+                    <SelectItem value="granted">Grant (force on)</SelectItem>
+                    <SelectItem value="revoked">Revoke (force off)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {/* Inline white-label toggle: the override controls whether
+                    the tenant CAN use white-label; this toggle says whether
+                    they're actively using it right now. */}
+                {key === "white_label" ? (
+                  <label className="flex shrink-0 items-center gap-1.5 rounded-lg border border-black/10 px-2.5 py-1.5 text-[11px] font-semibold">
+                    <Checkbox
+                      checked={f.hidePlatformLogo}
+                      onCheckedChange={(c) =>
+                        set("hidePlatformLogo", c === true)
+                      }
+                      disabled={disabled || !effective}
+                    />
+                    Active
+                  </label>
+                ) : (
+                  <span className="w-[78px]" aria-hidden />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

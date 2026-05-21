@@ -18,6 +18,7 @@ import {
 
 export type DashRole = "admin" | "student" | "super";
 export type PartnerTier = "basic" | "standard" | "premium";
+export type FeatureKey = "ai_services" | "diagnostics" | "white_label";
 
 export type NavItem = {
   label: string;
@@ -25,6 +26,9 @@ export type NavItem = {
   icon: LucideIcon;
   /** Minimum partner tier to use this link. Omit = available to Basic. */
   minTier?: PartnerTier;
+  /** Feature override key — when set, an explicit override on the tenant
+   *  beats the tier requirement (grant or revoke). */
+  featureKey?: FeatureKey;
 };
 
 export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
@@ -35,8 +39,20 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
     { label: "Courses", href: "/admin/programs", icon: BookOpen },
     { label: "Enrollments", href: "/admin/enrollments", icon: ClipboardList },
     { label: "Payments", href: "/admin/payments", icon: CreditCard },
-    { label: "AI Services", href: "/admin/ai-services", icon: Sparkles, minTier: "premium" },
-    { label: "Diagnostics", href: "/admin/diagnostics", icon: Activity, minTier: "premium" },
+    {
+      label: "AI Services",
+      href: "/admin/ai-services",
+      icon: Sparkles,
+      minTier: "premium",
+      featureKey: "ai_services",
+    },
+    {
+      label: "Diagnostics",
+      href: "/admin/diagnostics",
+      icon: Activity,
+      minTier: "premium",
+      featureKey: "diagnostics",
+    },
     { label: "Settings", href: "/admin/settings", icon: Settings },
   ],
   student: [

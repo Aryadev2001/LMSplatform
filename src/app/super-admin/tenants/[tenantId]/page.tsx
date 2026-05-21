@@ -186,6 +186,10 @@ export default async function TenantDetailPage({
                   referralPointsPercent: t.referralPointsPercent,
                   referralRedeemMaxPercent: t.referralRedeemMaxPercent,
                   platformFeeBps: t.platformFeeBps,
+                  hidePlatformLogo: t.hidePlatformLogo,
+                  featureOverrides: (t.featureOverrides ?? {}) as Partial<
+                    Record<"ai_services" | "diagnostics" | "white_label", boolean>
+                  >,
                 }}
               />
             </CardContent>

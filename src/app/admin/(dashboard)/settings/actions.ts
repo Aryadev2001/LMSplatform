@@ -235,6 +235,41 @@ export async function updateMyTenantBranding(
   return { success: true };
 }
 
+/**
+ * Toggle the tenant's hide_platform_logo flag — the active white-label
+ * switch. The route is feature-gated server-side so a Basic/Standard tenant
+ * with no override can't turn it on by calling this directly.
+ */
+export async function setWhiteLabelActive(
+  enabled: boolean,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const me = await requireRole("admin");
+  if (!me.tenantId) {
+    return { success: false, error: "Your account is not attached to a tenant." };
+  }
+  const { hasFeature } = await import("@/lib/tier-lock");
+  if (enabled && !(await hasFeature("white_label"))) {
+    return {
+      success: false,
+      error:
+        "White-label is a Premium feature. Upgrade your partner plan to enable it.",
+    };
+  }
+  await db
+    .update(tenants)
+    .set({ hidePlatformLogo: enabled, updatedAt: new Date() })
+    .where(eq(tenants.id, me.tenantId));
+  await recordAudit({
+    action: "tenant.white_label.toggle",
+    targetType: "tenant",
+    targetId: me.tenantId,
+    metadata: { enabled },
+  });
+  revalidatePath("/admin/settings");
+  revalidatePath("/", "layout");
+  return { success: true };
+}
+
 const TierRewardSchema = z.object({
   tier: z.enum(["BRONZE", "SILVER", "GOLD", "PLATINUM"]),
   courseId: z.string().uuid().nullable(),

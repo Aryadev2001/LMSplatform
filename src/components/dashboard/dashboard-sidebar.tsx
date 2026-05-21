@@ -17,7 +17,13 @@ import {
 } from "@/components/ui/sidebar";
 import { BrandMark } from "@/components/brand";
 import { EuroLogo } from "@/components/euro/euro-logo";
-import { NAV_ITEMS, ROLE_LABELS, type DashRole, type PartnerTier } from "./nav-items";
+import {
+  NAV_ITEMS,
+  ROLE_LABELS,
+  type DashRole,
+  type FeatureKey,
+  type PartnerTier,
+} from "./nav-items";
 import type { TenantBrand } from "./dashboard-shell";
 
 const TIER_RANK: Record<PartnerTier, number> = {
@@ -30,11 +36,18 @@ interface DashboardSidebarProps {
   role: DashRole;
   brand?: TenantBrand;
   tier?: PartnerTier;
+  featureOverrides?: Partial<Record<FeatureKey, boolean>>;
 }
 
-export function DashboardSidebar({ role, brand, tier }: DashboardSidebarProps) {
+export function DashboardSidebar({
+  role,
+  brand,
+  tier,
+  featureOverrides,
+}: DashboardSidebarProps) {
   const items = NAV_ITEMS[role];
   const activeTier: PartnerTier = tier ?? "basic";
+  const overrides = featureOverrides ?? {};
   const roleLabel = ROLE_LABELS[role];
   const brandName = brand?.name ?? "eurodigital.coach";
   // Show the eurodigital wordmark when we're branded as the platform itself
@@ -90,10 +103,19 @@ export function DashboardSidebar({ role, brand, tier }: DashboardSidebarProps) {
             <SidebarMenu>
               {items.map((item) => {
                 const isActive = isActiveLink(item.href);
-                const isLocked =
-                  role === "admin" &&
-                  !!item.minTier &&
-                  TIER_RANK[activeTier] < TIER_RANK[item.minTier];
+                // Override-aware lock: explicit grant unlocks, explicit revoke
+                // locks, otherwise fall back to the tier-rank comparison.
+                let isLocked = false;
+                if (role === "admin" && item.minTier) {
+                  const explicit = item.featureKey
+                    ? overrides[item.featureKey]
+                    : undefined;
+                  if (explicit === true) isLocked = false;
+                  else if (explicit === false) isLocked = true;
+                  else
+                    isLocked =
+                      TIER_RANK[activeTier] < TIER_RANK[item.minTier];
+                }
                 const href = isLocked
                   ? `/admin/partner?locked=${encodeURIComponent(item.label)}&min=${item.minTier}`
                   : item.href;

@@ -20,6 +20,8 @@ import { initialsOf, formatDate } from "@/lib/format";
 import { AddAdminDialog } from "./add-admin-dialog";
 import { AdminRowActions } from "./admin-row-actions";
 import { TenantBrandingForm } from "./tenant-branding-form";
+import { WhiteLabelToggle } from "./white-label-toggle";
+import { hasFeature } from "@/lib/tier-lock";
 import { PaymentGatewayForm } from "./payment-gateway-form";
 import { TierRewardsForm } from "./tier-rewards-form";
 import { ShieldCheck, Lock } from "lucide-react";
@@ -87,10 +89,12 @@ export default async function AdminSettingsPage() {
         await db
           .select({
             name: tenants.name,
+            slug: tenants.slug,
             logoUrl: tenants.logoUrl,
             brandPrimaryColor: tenants.brandPrimaryColor,
             brandSecondaryColor: tenants.brandSecondaryColor,
             heroTagline: tenants.heroTagline,
+            hidePlatformLogo: tenants.hidePlatformLogo,
             razorpayKeyId: tenants.razorpayKeyId,
             razorpayKeySecret: tenants.razorpayKeySecret,
             stripePublishableKey: tenants.stripePublishableKey,
@@ -104,6 +108,8 @@ export default async function AdminSettingsPage() {
           .limit(1)
       )[0]
     : undefined;
+
+  const whiteLabelUnlocked = await hasFeature("white_label");
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -172,7 +178,7 @@ export default async function AdminSettingsPage() {
               your own dashboards instantly.
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <TenantBrandingForm
               initial={{
                 logoUrl: tenantRow.logoUrl,
@@ -181,6 +187,14 @@ export default async function AdminSettingsPage() {
                 heroTagline: tenantRow.heroTagline ?? "",
               }}
             />
+
+            <div className="border-t pt-6">
+              <WhiteLabelToggle
+                initialEnabled={tenantRow.hidePlatformLogo}
+                unlocked={whiteLabelUnlocked}
+                tenantSlug={tenantRow.slug}
+              />
+            </div>
           </CardContent>
         </Card>
       )}

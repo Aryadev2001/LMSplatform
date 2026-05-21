@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
-import { BookOpen, Users, CalendarDays, Tag } from "lucide-react";
+import { BookOpen, Users, CalendarDays, Tag, GraduationCap, LogIn } from "lucide-react";
 import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { getStorefront } from "@/lib/storefront";
@@ -62,7 +63,15 @@ export default async function InstituteStorefrontPage({
 
   return (
     <div style={{ ...brandVars, background: "var(--ed-bg)" }} className="min-h-screen">
-      <EuroNav />
+      {tenant.whiteLabel ? (
+        <WhiteLabelHeader
+          name={tenant.name}
+          logoUrl={tenant.logoUrl}
+          primary={primary}
+        />
+      ) : (
+        <EuroNav />
+      )}
 
       {/* Hero banner */}
       <section
@@ -197,8 +206,69 @@ export default async function InstituteStorefrontPage({
         }}
       />
 
-      <EuroFooter />
+      {tenant.whiteLabel ? (
+        <WhiteLabelFooter name={tenant.name} />
+      ) : (
+        <EuroFooter />
+      )}
     </div>
+  );
+}
+
+function WhiteLabelHeader({
+  name,
+  logoUrl,
+  primary,
+}: {
+  name: string;
+  logoUrl: string | null;
+  primary: string;
+}) {
+  return (
+    <header
+      className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur"
+      style={{ borderColor: "var(--ed-line)" }}
+    >
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-3">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={name} className="h-9 w-auto object-contain" />
+          ) : (
+            <div
+              className="flex size-9 items-center justify-center rounded-xl text-white"
+              style={{ background: primary }}
+            >
+              <GraduationCap className="size-5" />
+            </div>
+          )}
+          <span className="text-lg font-extrabold tracking-tight" style={{ color: "var(--ed-ink)" }}>
+            {name}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/sign-in"
+            className="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors hover:bg-secondary"
+            style={{ borderColor: "var(--ed-line)" }}
+          >
+            <LogIn className="size-4" />
+            Student login
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function WhiteLabelFooter({ name }: { name: string }) {
+  return (
+    <footer
+      className="border-t py-8 text-center text-xs"
+      style={{ borderColor: "var(--ed-line)", color: "var(--ed-mute)" }}
+    >
+      © {new Date().getFullYear()} {name}. All rights reserved.
+    </footer>
   );
 }
 

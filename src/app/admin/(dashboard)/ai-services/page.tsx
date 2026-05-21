@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
-import { requireTier } from "@/lib/tier-lock";
+import { requireFeature } from "@/lib/tier-lock";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PartnerAiCatalog } from "./partner-ai-catalog";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PartnerAiServicesPage() {
   const me = await requireRole("admin");
-  await requireTier("premium", "AI Services");
+  await requireFeature("ai_services");
   const [u] = await db
     .select({ points: users.pointsBalance })
     .from(users)

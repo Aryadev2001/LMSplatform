@@ -252,6 +252,9 @@ export const tenants = pgTable(
     ownerPhotoUrl: text("owner_photo_url"),
     ownerProfile: text("owner_profile"),
     ownerSocials: jsonb("owner_socials"),
+    // ---- White-label + per-feature overrides (0014) ----
+    hidePlatformLogo: boolean("hide_platform_logo").notNull().default(false),
+    featureOverrides: jsonb("feature_overrides").notNull().default(sql`'{}'::jsonb`),
     // Lifecycle
     status: tenantStatusEnum("status").notNull().default("ACTIVE"),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),

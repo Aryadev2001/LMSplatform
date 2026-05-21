@@ -44,6 +44,10 @@ export interface Storefront {
     ownerProfile: string | null;
     ownerPhotoUrl: string | null;
     activeOffers: number;
+    /** True when the storefront should hide eurodigital.coach branding —
+     *  tenant has the white_label feature granted (via tier or override)
+     *  AND has actively enabled the hide-platform-logo flag. */
+    whiteLabel: boolean;
   };
   courses: StorefrontCourse[];
 }
@@ -66,6 +70,8 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
       ownerTitle: tenants.ownerTitle,
       ownerProfile: tenants.ownerProfile,
       ownerPhotoUrl: tenants.ownerPhotoUrl,
+      hidePlatformLogo: tenants.hidePlatformLogo,
+      featureOverrides: tenants.featureOverrides,
     })
     .from(tenants)
     .where(eq(tenants.slug, slug.toLowerCase()))
@@ -121,6 +127,17 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
       and(eq(courseOffers.tenantId, tenant.id), eq(courseOffers.isActive, true)),
     );
 
+  // White-label is on iff the tenant has the feature (via tier or override)
+  // AND has actively enabled hide_platform_logo. Tier check duplicated here
+  // because storefront pages are PUBLIC — no authed user to call requireFeature.
+  const overrides = (tenant.featureOverrides ?? {}) as {
+    white_label?: boolean;
+  };
+  const featureAllowed =
+    overrides.white_label === true ||
+    (overrides.white_label !== false && tenant.tier === "premium");
+  const whiteLabel = featureAllowed && tenant.hidePlatformLogo === true;
+
   return {
     tenant: {
       id: tenant.id,
@@ -140,6 +157,7 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
       ownerProfile: tenant.ownerProfile,
       ownerPhotoUrl: tenant.ownerPhotoUrl,
       activeOffers: offerCount ?? 0,
+      whiteLabel,
     },
     courses,
   };

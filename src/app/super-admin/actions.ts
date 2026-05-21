@@ -106,6 +106,12 @@ async function provisionTenantAdmin(
   return { invited: true };
 }
 
+const FeatureOverrideSchema = z.object({
+  ai_services: z.boolean().nullable().optional(),
+  diagnostics: z.boolean().nullable().optional(),
+  white_label: z.boolean().nullable().optional(),
+});
+
 const UpdateTenantSchema = z.object({
   tenantId: z.string().uuid(),
   name: z.string().trim().min(2).max(200),
@@ -118,6 +124,8 @@ const UpdateTenantSchema = z.object({
   referralPointsPercent: z.coerce.number().min(0).max(100),
   referralRedeemMaxPercent: z.coerce.number().min(0).max(100),
   platformFeePercent: z.coerce.number().min(0).max(50),
+  hidePlatformLogo: z.boolean().optional().default(false),
+  featureOverrides: FeatureOverrideSchema.optional().default({}),
 });
 
 const InviteMemberSchema = z.object({
@@ -228,6 +236,13 @@ export async function updateTenant(input: unknown): Promise<Result> {
     return { success: false, error: "Tenant not found." };
   }
 
+  // Strip nulls from feature overrides — null means "no override, use tier
+  // default", which we represent as the absence of the key.
+  const overrides: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(d.featureOverrides)) {
+    if (v === true || v === false) overrides[k] = v;
+  }
+
   await db
     .update(tenants)
     .set({
@@ -241,6 +256,8 @@ export async function updateTenant(input: unknown): Promise<Result> {
       referralPointsPercent: d.referralPointsPercent,
       referralRedeemMaxPercent: d.referralRedeemMaxPercent,
       platformFeeBps: Math.round(d.platformFeePercent * 100),
+      hidePlatformLogo: d.hidePlatformLogo,
+      featureOverrides: overrides,
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, d.tenantId));
@@ -254,6 +271,8 @@ export async function updateTenant(input: unknown): Promise<Result> {
       status: d.status,
       tier: d.tier,
       platformFeeBps: Math.round(d.platformFeePercent * 100),
+      hidePlatformLogo: d.hidePlatformLogo,
+      featureOverrides: overrides,
     },
   });
 
