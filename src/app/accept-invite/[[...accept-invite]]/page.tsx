@@ -2,7 +2,7 @@ import { SignUp } from "@clerk/nextjs";
 import { AuthShell } from "@/components/auth/auth-shell";
 
 export const metadata = {
-  title: "Accept your invitation — EDT",
+  title: "Accept your invitation — eurodigital.coach",
   robots: "noindex, nofollow",
 };
 

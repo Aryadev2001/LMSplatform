@@ -85,7 +85,7 @@ export default async function SuperCoursesPage() {
           <CardTitle className="text-sm">How it works</CardTitle>
         </CardHeader>
         <CardContent className="space-y-1 text-xs text-muted-foreground">
-          <p>• Promote turns one of your authored courses into a master (EDT catalog, no tenant).</p>
+          <p>• Promote turns one of your authored courses into a master (eurodigital.coach catalog, no tenant).</p>
           <p>• Push deep-clones the master (modules + lessons) into each selected tenant.</p>
           <p>• Sync re-pushes structure to every tenant copy; their price/status/tier-eligibility are preserved.</p>
         </CardContent>

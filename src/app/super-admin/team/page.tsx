@@ -39,7 +39,7 @@ export default async function SuperTeamPage() {
       <PageHeader
         eyebrow="Super Admin"
         title="Super-admin team"
-        description="EDT operators above all tenants. Owner manages membership."
+        description="eurodigital.coach operators above all tenants. Owner manages membership."
         actions={isOwner ? <InviteMemberDialog /> : undefined}
       />
 

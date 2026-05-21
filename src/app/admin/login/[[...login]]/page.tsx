@@ -4,7 +4,7 @@ import { Brand } from "@/components/brand";
 import { ShieldCheck, Lock } from "lucide-react";
 
 export const metadata = {
-  title: "Admin Console — EDT",
+  title: "Admin Console — eurodigital.coach",
   description: "Restricted access. Authorized administrators only.",
   robots: "noindex, nofollow",
 };

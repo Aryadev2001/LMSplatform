@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { EuroLogo } from "@/components/euro/euro-logo";
 
 interface BrandMarkProps {
   className?: string;
@@ -59,12 +60,21 @@ export function Brand({
     );
   }
 
-  const label = name ?? "eurodigital.coach";
+  // No tenant override → render the platform wordmark (eurodigital.coach).
+  // A named, non-platform tenant without a logoUrl falls back to the BrandMark
+  // + their own name (e.g. "Stanford Online").
+  if (!name) {
+    return (
+      <span className={cn("inline-flex", className)}>
+        <EuroLogo className={wordmarkClassName} />
+      </span>
+    );
+  }
   return (
     <div className={cn("inline-flex items-center gap-2 text-foreground", className)}>
       <BrandMark />
       <span className={cn("text-sm font-semibold tracking-tight", wordmarkClassName)}>
-        {label}
+        {name}
       </span>
     </div>
   );

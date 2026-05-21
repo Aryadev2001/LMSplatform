@@ -24,7 +24,7 @@ export default function OnboardingPage() {
           </div>
           <CardTitle className="text-2xl tracking-tight">No active course yet</CardTitle>
           <CardDescription>
-            Your account isn&apos;t enrolled in a program. Access at EDT is granted when you enrol
+            Your account isn&apos;t enrolled in a program. Access at eurodigital.coach is granted when you enrol
             in a course — there&apos;s no waiting on an admin. Start with the free Business X-Ray to
             find the right program for you.
           </CardDescription>

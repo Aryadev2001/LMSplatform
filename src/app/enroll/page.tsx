@@ -12,8 +12,8 @@ import { formatInr } from "@/lib/courses";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Enroll — EDT",
-  description: "Enrol in an EDT program. Pay once, get instant magic-link access.",
+  title: "Enroll — eurodigital.coach",
+  description: "Enrol in an eurodigital.coach program. Pay once, get instant magic-link access.",
 };
 
 export default async function EnrollPage({

@@ -26,7 +26,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Euro Digital Technologies — Business Diagnosis & Clarity Program",
   description:
-    "Take the free Business X-Ray: a 7-layer scan that scores your business 0–100 and shows you exactly what to fix first. By Euro Digital Technologies (EDT).",
+    "Take the free Business X-Ray: a 7-layer scan that scores your business 0–100 and shows you exactly what to fix first. By Euro Digital Technologies (eurodigital.coach).",
 };
 
 export default function RootLayout({

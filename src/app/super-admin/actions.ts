@@ -287,7 +287,7 @@ export async function inviteSuperMember(input: unknown): Promise<Result> {
       await db.insert(users).values({
         clerkId: clerkUser.id,
         email,
-        fullName: fullName || "EDT Team",
+        fullName: fullName || "eurodigital.coach Team",
         role: superRole,
         isSuperAdmin: true,
         tenantId: null,

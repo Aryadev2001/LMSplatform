@@ -13,7 +13,7 @@ import { CheckCircle2, CreditCard } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Secure checkout — EDT" };
+export const metadata = { title: "Secure checkout — eurodigital.coach" };
 
 export default async function PaymentPage({
   searchParams,

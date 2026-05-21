@@ -5,7 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 
 export const metadata = {
-  title: "Payment complete — EDT",
+  title: "Payment complete — eurodigital.coach",
 };
 
 export default async function EnrollSuccessPage({
