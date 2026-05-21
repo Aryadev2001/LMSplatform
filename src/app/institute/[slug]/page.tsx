@@ -1,24 +1,23 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
-import {
-  GraduationCap,
-  LogIn,
-  Building2,
-  ArrowRight,
-  ShieldCheck,
-  BookOpen,
-  Users,
-  CalendarDays,
-} from "lucide-react";
+import { BookOpen, Users, CalendarDays, Tag } from "lucide-react";
+import { EuroNav } from "@/components/euro/euro-nav";
+import { EuroFooter } from "@/components/euro/euro-footer";
 import { getStorefront } from "@/lib/storefront";
 import { StorefrontBody } from "./storefront-tabs";
+import { FollowShareInner } from "./follow-share";
 
 export const dynamic = "force-dynamic";
 
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
 const safeHex = (v: string | null | undefined, fb: string) =>
   v && HEX6.test(v) ? v : fb;
+
+const TIER_LABEL: Record<"basic" | "standard" | "premium", string> = {
+  basic: "Basic Tier",
+  standard: "Standard Tier",
+  premium: "Premium Tier",
+};
 
 export async function generateMetadata({
   params,
@@ -43,118 +42,138 @@ export default async function InstituteStorefrontPage({
   if (!sf) notFound();
 
   const { tenant, courses } = sf;
-  const primary = safeHex(tenant.brandPrimaryColor, "#00AEEF");
-  const secondary = safeHex(tenant.brandSecondaryColor, "#8DC63F");
+  const primary = safeHex(tenant.brandPrimaryColor, "#1AADE0");
+  const secondary = safeHex(tenant.brandSecondaryColor, "#8CC63F");
 
-  // Per-tenant brand vars scoped to this page — identical layout for every
-  // institute; only these values + logo + name change.
+  // Per-tenant brand vars scoped to this page (course cards, accents).
   const brandVars = {
-    "--brand-green": primary,
-    "--brand-blue": secondary,
+    "--brand-primary": primary,
+    "--brand-secondary": secondary,
     "--brand-gradient": `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`,
-    "--primary": primary,
-    "--ring": secondary,
   } as CSSProperties;
 
+  // Reads only — derived from the data we actually have. Metrics we don't
+  // track yet (ratings, completion %, instructor count) are omitted from the
+  // hero stat row rather than faked.
+  const courseCount = courses.length;
+  const learnerCount = tenant.learnerCount;
+  const sinceYear = tenant.sinceYear;
+  const activeOffers = tenant.activeOffers;
+
   return (
-    <div style={brandVars} className="min-h-screen bg-background text-foreground">
-      {/* Header — only logo + name differ per tenant */}
-      <header className="sticky top-0 z-20 border-b border-black/5 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
+    <div style={{ ...brandVars, background: "var(--ed-bg)" }} className="min-h-screen">
+      <EuroNav />
+
+      {/* Hero banner */}
+      <section
+        className="relative overflow-hidden"
+        style={{ background: "var(--ed-ink)" }}
+      >
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-25"
+          style={{
+            background:
+              "repeating-linear-gradient(135deg, transparent 0 14px, rgba(255,255,255,0.04) 14px 16px)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-32 -top-20 size-[28rem] rounded-full opacity-30 blur-3xl"
+          style={{ background: secondary }}
+        />
+
+        <div className="relative mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 lg:flex-row lg:items-start lg:py-12">
+          {/* Logo block */}
+          <div
+            className="flex size-32 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white p-3 shadow-xl"
+          >
             {tenant.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={tenant.logoUrl}
                 alt={tenant.name}
-                className="h-9 w-auto object-contain"
+                className="size-full object-contain"
               />
             ) : (
-              <div
-                className="flex size-9 items-center justify-center rounded-xl text-white"
-                style={{ background: "var(--brand-gradient)" }}
+              <span
+                className="text-3xl font-extrabold tracking-tight"
+                style={{ color: primary }}
               >
-                <GraduationCap className="size-5" />
-              </div>
+                {tenant.name
+                  .split(/\s+/)
+                  .slice(0, 3)
+                  .map((w) => w[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 3)}
+              </span>
             )}
-            <span className="text-lg font-bold tracking-tight">{tenant.name}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
-            >
-              <LogIn className="size-4" />
-              Student login
-            </Link>
-            <Link
-              href="/admin/login"
-              className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <Building2 className="size-4" />
-              Institute login
-            </Link>
-          </div>
-        </div>
-      </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-0 -z-10 opacity-[0.10]"
-          style={{ background: "var(--brand-gradient)" }}
-        />
-        <div className="mx-auto max-w-6xl px-6 py-20 text-center">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white"
-            style={{
-              background:
-                tenant.status === "ACTIVE" ? "var(--brand-gradient)" : "#6B7A8B",
-            }}
-          >
-            <ShieldCheck className="size-3.5" />
-            {tenant.status === "ACTIVE" ? "Verified Partner" : "Trial Institute"}
-          </span>
-          <h1 className="mt-5 text-balance text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
-            Learn with{" "}
+          {/* Title block */}
+          <div className="min-w-0 flex-1 text-white">
             <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: "var(--brand-gradient)" }}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest"
+              style={{
+                background: "rgba(141,198,63,0.15)",
+                border: "1px solid rgba(141,198,63,0.4)",
+                color: "#B7E26B",
+              }}
             >
-              {tenant.name}
+              ✓ Verified Partner · {TIER_LABEL[tenant.tier]}
             </span>
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-balance text-muted-foreground md:text-lg">
-            {tenant.heroTagline ??
-              "Industry-ready courses, hands-on learning, and verifiable certificates."}
-          </p>
+            <h1 className="mt-3 text-balance font-display text-3xl font-extrabold leading-tight tracking-tight md:text-[40px]">
+              {tenant.name}
+            </h1>
+            {tenant.heroTagline && (
+              <p className="mt-2 max-w-2xl text-balance text-sm leading-relaxed text-white/75 md:text-base">
+                {tenant.heroTagline}
+              </p>
+            )}
 
-          {/* Stats row — real counts only (ratings/completion not modelled). */}
-          <div className="mx-auto mt-8 flex max-w-xl flex-wrap items-center justify-center gap-x-10 gap-y-4">
-            <Stat icon={BookOpen} value={`${courses.length}`} label="Courses" />
-            <Stat icon={Users} value={`${tenant.learnerCount}`} label="Learners" />
-            <Stat
-              icon={CalendarDays}
-              value={`${tenant.sinceYear}`}
-              label="On the platform since"
-            />
+            {/* Stat row — only metrics we actually compute */}
+            <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-white/70">
+              <span className="inline-flex items-center gap-1.5">
+                <BookOpen className="size-3.5" style={{ color: primary }} />
+                <span className="font-bold text-white">{courseCount}</span>
+                courses
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="size-3.5" style={{ color: primary }} />
+                <span className="font-bold text-white">{learnerCount}</span>
+                learners
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarDays className="size-3.5" style={{ color: primary }} />
+                <span className="font-bold text-white">Est. {sinceYear}</span>
+              </span>
+              {activeOffers > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Tag className="size-3.5" style={{ color: secondary }} />
+                  <span className="font-bold text-white">{activeOffers}</span>
+                  active offer{activeOffers === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-              style={{ background: "var(--brand-gradient)" }}
-            >
-              Start learning
-              <ArrowRight className="size-4" />
-            </Link>
-            <a
-              href="#courses"
-              className="rounded-xl border border-black/10 px-6 py-3 text-sm font-semibold transition-colors hover:bg-secondary"
-            >
-              Browse courses
-            </a>
+
+          {/* Action buttons */}
+          <div className="flex flex-col gap-2 lg:w-56">
+            {activeOffers > 0 && (
+              <a
+                href="#offers"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl text-sm font-extrabold text-black transition-opacity hover:opacity-90"
+                style={{ background: secondary }}
+              >
+                <Tag className="size-4" />
+                View All Offers
+              </a>
+            )}
+            <FollowShareButtons
+              tenantName={tenant.name}
+              tenantSlug={tenant.slug}
+            />
           </div>
         </div>
       </section>
@@ -162,33 +181,35 @@ export default async function InstituteStorefrontPage({
       <StorefrontBody
         tenantName={tenant.name}
         heroTagline={tenant.heroTagline}
+        companyProfile={tenant.companyProfile}
+        owner={{
+          name: tenant.ownerName,
+          title: tenant.ownerTitle,
+          profile: tenant.ownerProfile,
+          photoUrl: tenant.ownerPhotoUrl,
+        }}
         courses={courses}
+        stats={{
+          courseCount,
+          learnerCount,
+          sinceYear,
+          activeOffers,
+        }}
       />
 
-      <footer className="border-t border-black/5 py-8 text-center text-xs text-muted-foreground">
-        {tenant.name} · Powered by{" "}
-        <span className="font-semibold">eurodigital.coach</span>
-      </footer>
+      <EuroFooter />
     </div>
   );
 }
 
-function Stat({
-  icon: Icon,
-  value,
-  label,
+function FollowShareButtons({
+  tenantName,
+  tenantSlug,
 }: {
-  icon: typeof BookOpen;
-  value: string;
-  label: string;
+  tenantName: string;
+  tenantSlug: string;
 }) {
   return (
-    <div className="flex flex-col items-center">
-      <Icon className="size-4 text-muted-foreground" />
-      <div className="mt-1 text-2xl font-extrabold tracking-tight">{value}</div>
-      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </div>
-    </div>
+    <FollowShareInner tenantName={tenantName} tenantSlug={tenantSlug} />
   );
 }

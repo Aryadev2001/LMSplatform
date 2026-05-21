@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { tenants, programs, users } from "@/db/schema";
+import { tenants, programs, users, courseOffers, modules } from "@/db/schema";
 
 /**
  * Generic per-tenant storefront data. Every institute gets the SAME layout —
@@ -18,6 +18,11 @@ export interface StorefrontCourse {
   type: "one_time" | "subscription";
   badgeColor: string | null;
   durationMonths: number;
+  imageUrl: string | null;
+  introVideoUrl: string | null;
+  language: "en" | "ar" | "hi";
+  totalDurationHours: number;
+  moduleCount: number;
 }
 
 export interface Storefront {
@@ -30,8 +35,15 @@ export interface Storefront {
     brandSecondaryColor: string;
     heroTagline: string | null;
     status: "ACTIVE" | "TRIAL" | "CHURNED";
+    tier: "basic" | "standard" | "premium";
     sinceYear: number;
     learnerCount: number;
+    companyProfile: string | null;
+    ownerName: string | null;
+    ownerTitle: string | null;
+    ownerProfile: string | null;
+    ownerPhotoUrl: string | null;
+    activeOffers: number;
   };
   courses: StorefrontCourse[];
 }
@@ -48,6 +60,12 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
       heroTagline: tenants.heroTagline,
       status: tenants.status,
       createdAt: tenants.createdAt,
+      tier: tenants.tier,
+      companyProfile: tenants.companyProfile,
+      ownerName: tenants.ownerName,
+      ownerTitle: tenants.ownerTitle,
+      ownerProfile: tenants.ownerProfile,
+      ownerPhotoUrl: tenants.ownerPhotoUrl,
     })
     .from(tenants)
     .where(eq(tenants.slug, slug.toLowerCase()))
@@ -78,6 +96,13 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
       type: programs.type,
       badgeColor: programs.badgeColor,
       durationMonths: programs.durationMonths,
+      imageUrl: programs.imageUrl,
+      introVideoUrl: programs.introVideoUrl,
+      language: programs.language,
+      totalDurationHours: programs.totalDurationHours,
+      moduleCount: sql<number>`(
+        select count(*)::int from ${modules} m where m.course_id = ${programs.id}
+      )`,
     })
     .from(programs)
     .where(
@@ -89,6 +114,13 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
     )
     .orderBy(desc(programs.createdAt));
 
+  const [{ offerCount }] = await db
+    .select({ offerCount: sql<number>`count(*)::int` })
+    .from(courseOffers)
+    .where(
+      and(eq(courseOffers.tenantId, tenant.id), eq(courseOffers.isActive, true)),
+    );
+
   return {
     tenant: {
       id: tenant.id,
@@ -99,8 +131,15 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
       brandSecondaryColor: tenant.brandSecondaryColor,
       heroTagline: tenant.heroTagline,
       status: tenant.status,
+      tier: tenant.tier,
       sinceYear: (tenant.createdAt ?? new Date()).getFullYear(),
       learnerCount: learners ?? 0,
+      companyProfile: tenant.companyProfile,
+      ownerName: tenant.ownerName,
+      ownerTitle: tenant.ownerTitle,
+      ownerProfile: tenant.ownerProfile,
+      ownerPhotoUrl: tenant.ownerPhotoUrl,
+      activeOffers: offerCount ?? 0,
     },
     courses,
   };

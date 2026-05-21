@@ -178,6 +178,7 @@ export default async function TenantDetailPage({
                   name: t.name,
                   slug: t.slug,
                   status: t.status,
+                  tier: t.tier,
                   brandPrimaryColor: t.brandPrimaryColor,
                   brandSecondaryColor: t.brandSecondaryColor,
                   heroTagline: t.heroTagline ?? "",

@@ -18,6 +18,7 @@ import {
 import { updateTenant } from "../../actions";
 
 type Status = "ACTIVE" | "SUSPENDED" | "TRIAL" | "CHURNED";
+type Tier = "basic" | "standard" | "premium";
 
 interface Props {
   writable: boolean;
@@ -26,6 +27,7 @@ interface Props {
     name: string;
     slug: string;
     status: Status;
+    tier: Tier;
     brandPrimaryColor: string;
     brandSecondaryColor: string;
     heroTagline: string;
@@ -51,6 +53,7 @@ export function TenantEditForm({ writable, tenant }: Props) {
         tenantId: f.id,
         name: f.name,
         status: f.status,
+        tier: f.tier,
         brandPrimaryColor: f.brandPrimaryColor,
         brandSecondaryColor: f.brandSecondaryColor,
         heroTagline: f.heroTagline,
@@ -94,7 +97,7 @@ export function TenantEditForm({ writable, tenant }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Status</Label>
           <Select
@@ -112,6 +115,27 @@ export function TenantEditForm({ writable, tenant }: Props) {
               <SelectItem value="CHURNED">Churned</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Partner tier</Label>
+          <Select
+            value={f.tier}
+            onValueChange={(v) => v && set("tier", v as Tier)}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-10 rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="basic">Basic (free)</SelectItem>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="premium">Premium</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            Grants access to gated features (AI Services, Diagnostics, etc).
+            Manual override — bypasses self-serve checkout.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Hero tagline</Label>

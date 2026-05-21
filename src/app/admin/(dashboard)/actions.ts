@@ -95,6 +95,9 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
       termsHtml: parsed.data.termsHtml || null,
       certificateTemplateUrl: parsed.data.certificateTemplateUrl || null,
       tenantId,
+      // Auto-publish: course goes live on the storefront immediately. Partner
+      // can still toggle isActive=false to take it down without unpublishing.
+      status: "published",
     })
     .returning({ id: programs.id });
   await recordAudit({

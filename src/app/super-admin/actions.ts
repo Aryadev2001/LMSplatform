@@ -110,6 +110,7 @@ const UpdateTenantSchema = z.object({
   tenantId: z.string().uuid(),
   name: z.string().trim().min(2).max(200),
   status: z.enum(["ACTIVE", "SUSPENDED", "TRIAL", "CHURNED"]),
+  tier: z.enum(["basic", "standard", "premium"]),
   brandPrimaryColor: z.string().regex(HEX),
   brandSecondaryColor: z.string().regex(HEX),
   heroTagline: z.string().trim().max(240).optional().or(z.literal("")),
@@ -232,6 +233,7 @@ export async function updateTenant(input: unknown): Promise<Result> {
     .set({
       name: d.name,
       status: d.status,
+      tier: d.tier,
       brandPrimaryColor: d.brandPrimaryColor,
       brandSecondaryColor: d.brandSecondaryColor,
       heroTagline: d.heroTagline || null,
@@ -250,6 +252,7 @@ export async function updateTenant(input: unknown): Promise<Result> {
     metadata: {
       name: d.name,
       status: d.status,
+      tier: d.tier,
       platformFeeBps: Math.round(d.platformFeePercent * 100),
     },
   });
