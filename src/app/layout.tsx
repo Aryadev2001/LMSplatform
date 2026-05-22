@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { TenantBrandStyle } from "@/components/tenant-brand-style";
+import { NavProgress } from "@/components/nav-progress";
+import { Suspense } from "react";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -67,6 +69,12 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} ${poppins.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col bg-background text-foreground">
+          {/* Suspense around the nav-progress because it reads
+              useSearchParams() which would otherwise opt-in the whole tree
+              to client-side bailout on routes without their own boundary. */}
+          <Suspense fallback={null}>
+            <NavProgress />
+          </Suspense>
           <TenantBrandStyle />
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
             <TooltipProvider delay={150}>
