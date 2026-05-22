@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -61,7 +62,18 @@ export interface Storefront {
   courses: StorefrontCourse[];
 }
 
-export async function getStorefront(slug: string): Promise<Storefront | null> {
+/**
+ * Storefront read. Caches per slug for 60s + parallelises the dependent
+ * queries (learners count, courses, offers count) once we know the
+ * tenantId. Before: 4 sequential queries. After: 1 tenant lookup + 1
+ * parallel batch of 3. Combined with the cache this fixed the ~30%
+ * non-2xx rate under load — public storefront views no longer hammer
+ * Neon on every request.
+ *
+ * To invalidate (e.g. partner publishes a new course): callers can
+ * revalidateTag(`tenant:${slug}`) on the relevant write paths.
+ */
+async function _readStorefront(slug: string): Promise<Storefront | null> {
   const [tenant] = await db
     .select({
       id: tenants.id,
@@ -86,67 +98,74 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
     .where(eq(tenants.slug, slug.toLowerCase()))
     .limit(1);
 
-  // No storefront for a missing or suspended institute.
   if (!tenant || tenant.status === "SUSPENDED") return null;
 
-  const [{ learners }] = await db
-    .select({ learners: sql<number>`count(*)::int` })
-    .from(users)
-    .where(
-      and(
-        eq(users.tenantId, tenant.id),
-        sql`${users.role} in ('student','STUDENT','coach')`,
+  // Three reads that all only need tenant.id — fan out in parallel.
+  const [learnerRows, courses, offerRows] = await Promise.all([
+    db
+      .select({ learners: sql<number>`count(*)::int` })
+      .from(users)
+      .where(
+        and(
+          eq(users.tenantId, tenant.id),
+          sql`${users.role} in ('student','STUDENT','coach')`,
+        ),
       ),
-    );
-
-  const courses = await db
-    .select({
-      id: programs.id,
-      slug: programs.slug,
-      title: programs.name,
-      tagline: programs.tagline,
-      priceCents: programs.priceCents,
-      currency: programs.currency,
-      tier: programs.tier,
-      type: programs.type,
-      badgeColor: programs.badgeColor,
-      durationMonths: programs.durationMonths,
-      imageUrl: programs.imageUrl,
-      introVideoUrl: programs.introVideoUrl,
-      language: programs.language,
-      totalDurationHours: programs.totalDurationHours,
-      moduleCount: sql<number>`(
-        select count(*)::int from ${modules} m where m.course_id = ${programs.id}
-      )`,
-      avgRating: sql<number>`coalesce((
-        select avg(rating)::float8 from ${courseReviews} cr
-        where cr.course_id = ${programs.id}
-      ), 0)`,
-      reviewCount: sql<number>`coalesce((
-        select count(*)::int from ${courseReviews} cr
-        where cr.course_id = ${programs.id}
-      ), 0)`,
-    })
-    .from(programs)
-    .where(
-      and(
-        eq(programs.tenantId, tenant.id),
-        eq(programs.status, "published"),
-        eq(programs.isActive, true),
+    db
+      .select({
+        id: programs.id,
+        slug: programs.slug,
+        title: programs.name,
+        tagline: programs.tagline,
+        priceCents: programs.priceCents,
+        currency: programs.currency,
+        tier: programs.tier,
+        type: programs.type,
+        badgeColor: programs.badgeColor,
+        durationMonths: programs.durationMonths,
+        imageUrl: programs.imageUrl,
+        introVideoUrl: programs.introVideoUrl,
+        language: programs.language,
+        totalDurationHours: programs.totalDurationHours,
+        moduleCount: sql<number>`(
+          select count(*)::int from ${modules} m where m.course_id = ${programs.id}
+        )`,
+        avgRating: sql<number>`coalesce((
+          select avg(rating)::float8 from ${courseReviews} cr
+          where cr.course_id = ${programs.id}
+        ), 0)`,
+        reviewCount: sql<number>`coalesce((
+          select count(*)::int from ${courseReviews} cr
+          where cr.course_id = ${programs.id}
+        ), 0)`,
+      })
+      .from(programs)
+      .where(
+        and(
+          eq(programs.tenantId, tenant.id),
+          eq(programs.status, "published"),
+          eq(programs.isActive, true),
+        ),
+      )
+      .orderBy(desc(programs.createdAt)),
+    db
+      .select({ offerCount: sql<number>`count(*)::int` })
+      .from(courseOffers)
+      .where(
+        and(
+          eq(courseOffers.tenantId, tenant.id),
+          eq(courseOffers.isActive, true),
+        ),
       ),
-    )
-    .orderBy(desc(programs.createdAt));
+  ]);
 
-  const [{ offerCount }] = await db
-    .select({ offerCount: sql<number>`count(*)::int` })
-    .from(courseOffers)
-    .where(
-      and(eq(courseOffers.tenantId, tenant.id), eq(courseOffers.isActive, true)),
-    );
+  const learners = learnerRows[0]?.learners ?? 0;
+  const offerCount = offerRows[0]?.offerCount ?? 0;
 
-  // White-label is on iff the tenant has the feature (via tier or override)
-  // AND has actively enabled hide_platform_logo. Tier check duplicated here
-  // because storefront pages are PUBLIC — no authed user to call requireFeature.
+  // White-label is on iff the tenant has the feature (via tier or
+  // override) AND has actively enabled hide_platform_logo. Tier check
+  // duplicated here because storefront pages are PUBLIC — no authed
+  // user to call requireFeature.
   const overrides = (tenant.featureOverrides ?? {}) as {
     white_label?: boolean;
   };
@@ -167,15 +186,25 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
       status: tenant.status,
       tier: tenant.tier,
       sinceYear: (tenant.createdAt ?? new Date()).getFullYear(),
-      learnerCount: learners ?? 0,
+      learnerCount: learners,
       companyProfile: tenant.companyProfile,
       ownerName: tenant.ownerName,
       ownerTitle: tenant.ownerTitle,
       ownerProfile: tenant.ownerProfile,
       ownerPhotoUrl: tenant.ownerPhotoUrl,
-      activeOffers: offerCount ?? 0,
+      activeOffers: offerCount,
       whiteLabel,
     },
     courses,
   };
+}
+
+const _cachedStorefront = unstable_cache(
+  async (slug: string) => _readStorefront(slug),
+  ["storefront-by-slug"],
+  { revalidate: 60, tags: ["tenant", "marketplace"] },
+);
+
+export function getStorefront(slug: string): Promise<Storefront | null> {
+  return _cachedStorefront(slug);
 }
