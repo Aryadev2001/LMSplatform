@@ -188,6 +188,12 @@ const BrandingSchema = z.object({
   brandPrimaryColor: z.string().regex(HEX, "Use a #rrggbb hex color"),
   brandSecondaryColor: z.string().regex(HEX, "Use a #rrggbb hex color"),
   heroTagline: z.string().trim().max(240).optional().or(z.literal("")),
+  introVideoUrl: z
+    .string()
+    .url()
+    .max(2048)
+    .optional()
+    .or(z.literal("")),
 });
 
 /**
@@ -215,6 +221,7 @@ export async function updateMyTenantBranding(
       brandPrimaryColor: d.brandPrimaryColor,
       brandSecondaryColor: d.brandSecondaryColor,
       heroTagline: d.heroTagline ? d.heroTagline : null,
+      introVideoUrl: d.introVideoUrl ? d.introVideoUrl : null,
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, me.tenantId));

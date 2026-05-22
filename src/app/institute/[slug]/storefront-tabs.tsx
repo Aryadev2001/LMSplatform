@@ -75,6 +75,7 @@ export function StorefrontBody({
   tenantName,
   heroTagline,
   companyProfile,
+  introVideoUrl,
   owner,
   courses,
   stats,
@@ -83,6 +84,7 @@ export function StorefrontBody({
   tenantName: string;
   heroTagline: string | null;
   companyProfile: string | null;
+  introVideoUrl: string | null;
   owner: OwnerSummary;
   courses: StorefrontCourse[];
   stats: StorefrontStats;
@@ -183,6 +185,7 @@ export function StorefrontBody({
           tenantName={tenantName}
           heroTagline={heroTagline}
           companyProfile={companyProfile}
+          introVideoUrl={introVideoUrl}
           owner={owner}
           stats={stats}
         />
@@ -324,51 +327,94 @@ function AboutTab({
   tenantName,
   heroTagline,
   companyProfile,
+  introVideoUrl,
   owner,
   stats,
 }: {
   tenantName: string;
   heroTagline: string | null;
   companyProfile: string | null;
+  introVideoUrl: string | null;
   owner: OwnerSummary;
   stats: StorefrontStats;
 }) {
+  // YouTube / Vimeo URLs need an embed transform — direct mp4 / webm
+  // can go straight into a <video> element. Any URL we don't recognize
+  // falls back to a "click to watch" anchor so we never embed something
+  // unsafe.
+  const embed = introVideoUrl ? toEmbed(introVideoUrl) : null;
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
-      {/* Intro video placeholder — replaced with a real player once tenant
-          intro_video_url lands on the schema. We show a dark card with the
-          play icon so the layout doesn't shift when video is added. */}
       <div
         className="relative aspect-video w-full overflow-hidden rounded-2xl"
         style={{ background: "var(--ed-ink)" }}
       >
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-30"
-          style={{
-            background:
-              "repeating-linear-gradient(135deg, transparent 0 14px, rgba(255,255,255,0.05) 14px 16px)",
-          }}
-        />
-        <span
-          className="absolute left-4 top-4 rounded-md bg-white/95 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider"
-          style={{ color: "var(--ed-ink)" }}
-        >
-          Institute Intro Video
-        </span>
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex size-16 items-center justify-center rounded-full bg-white/95 shadow-lg">
-            <Play
-              className="size-6 translate-x-[2px] fill-current"
-              style={{ color: "var(--ed-ink)" }}
+        {embed?.kind === "iframe" ? (
+          <iframe
+            src={embed.src}
+            title={`${tenantName} intro video`}
+            className="absolute inset-0 size-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        ) : embed?.kind === "video" ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video
+            src={embed.src}
+            controls
+            preload="metadata"
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : (
+          <>
+            <div
+              aria-hidden
+              className="absolute inset-0 opacity-30"
+              style={{
+                background:
+                  "repeating-linear-gradient(135deg, transparent 0 14px, rgba(255,255,255,0.05) 14px 16px)",
+              }}
             />
-          </span>
-        </span>
-        <span
-          className="absolute bottom-4 right-4 rounded-md bg-black/65 px-2 py-1 text-[10px] font-bold text-white"
-        >
-          —
-        </span>
+            <span
+              className="absolute left-4 top-4 rounded-md bg-white/95 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider"
+              style={{ color: "var(--ed-ink)" }}
+            >
+              Institute Intro Video
+            </span>
+            {introVideoUrl ? (
+              <a
+                href={introVideoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors hover:bg-black/40"
+              >
+                <span className="flex size-16 items-center justify-center rounded-full bg-white/95 shadow-lg">
+                  <Play
+                    className="size-6 translate-x-[2px] fill-current"
+                    style={{ color: "var(--ed-ink)" }}
+                  />
+                </span>
+              </a>
+            ) : (
+              <span className="absolute inset-0 flex items-center justify-center">
+                <span className="flex size-16 items-center justify-center rounded-full bg-white/95 shadow-lg">
+                  <Play
+                    className="size-6 translate-x-[2px] fill-current"
+                    style={{ color: "var(--ed-ink)" }}
+                  />
+                </span>
+              </span>
+            )}
+            {!introVideoUrl && (
+              <span
+                className="absolute bottom-4 right-4 rounded-md bg-black/65 px-2 py-1 text-[10px] font-bold text-white"
+              >
+                —
+              </span>
+            )}
+          </>
+        )}
       </div>
 
       <div>
@@ -420,6 +466,54 @@ function AboutTab({
       </div>
     </div>
   );
+}
+
+/**
+ * Best-effort URL → embeddable source. Recognises:
+ *   - YouTube (watch?v= or youtu.be/) → privacy-enhanced /embed/
+ *   - Vimeo (vimeo.com/<id>)          → player.vimeo.com/video/<id>
+ *   - Direct .mp4 / .webm / .ogv      → native <video>
+ *   - Anything else                   → null (parent renders a click-out)
+ */
+function toEmbed(
+  raw: string,
+): { kind: "iframe" | "video"; src: string } | null {
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.toLowerCase();
+
+    if (host.includes("youtube.com") || host === "youtu.be") {
+      let id: string | null = null;
+      if (host === "youtu.be") {
+        id = url.pathname.slice(1).split("/")[0] || null;
+      } else if (url.pathname.startsWith("/watch")) {
+        id = url.searchParams.get("v");
+      } else if (url.pathname.startsWith("/embed/")) {
+        id = url.pathname.split("/embed/")[1]?.split("/")[0] ?? null;
+      }
+      if (id) {
+        return {
+          kind: "iframe",
+          src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`,
+        };
+      }
+    }
+    if (host.includes("vimeo.com")) {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      if (id && /^\d+$/.test(id)) {
+        return {
+          kind: "iframe",
+          src: `https://player.vimeo.com/video/${id}`,
+        };
+      }
+    }
+    if (/\.(mp4|webm|ogv)(\?|$)/i.test(url.pathname)) {
+      return { kind: "video", src: url.toString() };
+    }
+  } catch {
+    /* invalid URL → fall through to null */
+  }
+  return null;
 }
 
 function ReviewsTab({

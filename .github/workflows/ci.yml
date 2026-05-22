@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel previous runs of the same branch when a new push lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # `npm run build` does `next build` which needs DATABASE_URL set or it
+    # short-circuits on src/db/client.ts. We use a fake URL that's the
+    # right SHAPE — the build never actually opens a connection unless a
+    # page is rendered with data. ditto Clerk keys.
+    env:
+      DATABASE_URL: postgresql://fake:fake@localhost:5432/fake?sslmode=disable
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ci-only
+      CLERK_SECRET_KEY: sk_test_ci-only
+      NEXT_PUBLIC_APP_URL: https://eurodigital.coach
+      APP_ENCRYPTION_KEY: "00000000000000000000000000000000000000000000000000000000000000=="
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+        continue-on-error: true # Pre-existing warnings in test scripts shouldn't block PRs.
+
+      - name: Build
+        run: npm run build

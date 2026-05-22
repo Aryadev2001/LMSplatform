@@ -94,6 +94,7 @@ export default async function AdminSettingsPage() {
             brandPrimaryColor: tenants.brandPrimaryColor,
             brandSecondaryColor: tenants.brandSecondaryColor,
             heroTagline: tenants.heroTagline,
+            introVideoUrl: tenants.introVideoUrl,
             hidePlatformLogo: tenants.hidePlatformLogo,
             razorpayKeyId: tenants.razorpayKeyId,
             razorpayKeySecret: tenants.razorpayKeySecret,
@@ -185,6 +186,7 @@ export default async function AdminSettingsPage() {
                 brandPrimaryColor: tenantRow.brandPrimaryColor,
                 brandSecondaryColor: tenantRow.brandSecondaryColor,
                 heroTagline: tenantRow.heroTagline ?? "",
+                introVideoUrl: tenantRow.introVideoUrl,
               }}
             />
 

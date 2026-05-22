@@ -16,6 +16,7 @@ interface Props {
     brandPrimaryColor: string;
     brandSecondaryColor: string;
     heroTagline: string;
+    introVideoUrl: string | null;
   };
 }
 
@@ -26,6 +27,9 @@ export function TenantBrandingForm({ initial }: Props) {
   const [primary, setPrimary] = useState(initial.brandPrimaryColor);
   const [secondary, setSecondary] = useState(initial.brandSecondaryColor);
   const [tagline, setTagline] = useState(initial.heroTagline);
+  const [introVideoUrl, setIntroVideoUrl] = useState(
+    initial.introVideoUrl ?? "",
+  );
 
   function onSave() {
     startTransition(async () => {
@@ -34,6 +38,7 @@ export function TenantBrandingForm({ initial }: Props) {
         brandPrimaryColor: primary,
         brandSecondaryColor: secondary,
         heroTagline: tagline,
+        introVideoUrl: introVideoUrl.trim(),
       });
       if (r.success) {
         toast.success("Branding saved");
@@ -123,6 +128,21 @@ export function TenantBrandingForm({ initial }: Props) {
           placeholder="Clarity for ambitious founders"
           className="h-10 rounded-xl"
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Institute intro video URL</Label>
+        <Input
+          type="url"
+          value={introVideoUrl}
+          onChange={(e) => setIntroVideoUrl(e.target.value)}
+          placeholder="https://… (YouTube / Vimeo / direct mp4)"
+          className="h-10 rounded-xl"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Shown on the About-the-Institute tab of your public storefront.
+          Leave empty for the placeholder.
+        </p>
       </div>
 
       <div className="flex justify-end">

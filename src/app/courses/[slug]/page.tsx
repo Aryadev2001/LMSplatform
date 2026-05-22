@@ -23,7 +23,7 @@ import { db } from "@/db/client";
 import { tenants, exams } from "@/db/schema";
 import { getCourseBySlug, formatRuntime } from "@/lib/courses";
 import { getRelatedCourses } from "@/lib/marketplace";
-import { getCourseRating, listCourseReviews } from "@/lib/reviews";
+import { getCourseRatingDistribution, listCourseReviews } from "@/lib/reviews";
 import { formatCurrency } from "@/lib/format";
 import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
@@ -92,7 +92,7 @@ export default async function CourseDetailPage({
       .select({ n: sql<number>`count(*)::int` })
       .from(exams)
       .where(and(eq(exams.programId, course.id), eq(exams.isActive, true))),
-    getCourseRating(course.id),
+    getCourseRatingDistribution(course.id),
     listCourseReviews(course.id, { limit: 8 }),
   ]);
   const examCount = examCountRow?.n ?? 0;
@@ -604,6 +604,79 @@ export default async function CourseDetailPage({
                 </div>
               )}
             </div>
+
+            {rating.count > 0 && (
+              <div
+                className="mb-6 rounded-2xl border bg-white p-5"
+                style={{ borderColor: "var(--ed-line)" }}
+              >
+                <div className="grid items-center gap-6 sm:grid-cols-[160px_1fr]">
+                  <div className="text-center">
+                    <div
+                      className="text-5xl font-extrabold tracking-tight"
+                      style={{ color: "var(--ed-ink)" }}
+                    >
+                      {rating.avg.toFixed(1)}
+                    </div>
+                    <div className="mt-1 flex justify-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          className={`size-3.5 ${rating.avg >= n - 0.5 ? "fill-current" : ""}`}
+                          style={{
+                            color:
+                              rating.avg >= n - 0.5
+                                ? "var(--ed-warn)"
+                                : "var(--ed-line)",
+                          }}
+                          strokeWidth={1.5}
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className="mt-1 text-[11px] font-semibold uppercase tracking-wider"
+                      style={{ color: "var(--ed-mute)" }}
+                    >
+                      {rating.count} review{rating.count === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {([5, 4, 3, 2, 1] as const).map((stars) => {
+                      const n = rating.dist[5 - stars];
+                      const pct = rating.count > 0 ? (n / rating.count) * 100 : 0;
+                      return (
+                        <div key={stars} className="flex items-center gap-3">
+                          <span
+                            className="w-8 text-xs tabular-nums"
+                            style={{ color: "var(--ed-ink-2)" }}
+                          >
+                            {stars}★
+                          </span>
+                          <div
+                            className="relative h-2 flex-1 overflow-hidden rounded-full"
+                            style={{ background: "var(--ed-line)" }}
+                          >
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full"
+                              style={{
+                                width: `${pct}%`,
+                                background: "var(--ed-warn)",
+                              }}
+                            />
+                          </div>
+                          <span
+                            className="w-10 text-right text-xs tabular-nums"
+                            style={{ color: "var(--ed-mute)" }}
+                          >
+                            {n}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {reviews.length === 0 ? (
               <div

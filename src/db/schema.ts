@@ -256,6 +256,8 @@ export const tenants = pgTable(
     // ---- White-label + per-feature overrides (0014) ----
     hidePlatformLogo: boolean("hide_platform_logo").notNull().default(false),
     featureOverrides: jsonb("feature_overrides").notNull().default(sql`'{}'::jsonb`),
+    // ---- 0018 — institute-level intro video for storefront About tab ----
+    introVideoUrl: text("intro_video_url"),
     // Lifecycle
     status: tenantStatusEnum("status").notNull().default("ACTIVE"),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
@@ -616,6 +618,9 @@ export const courseReviews = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+    // ---- 0018 — super-admin moderation ----
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
+    hiddenReason: varchar("hidden_reason", { length: 240 }),
   },
   (t) => [
     index("course_reviews_course_idx").on(t.courseId),

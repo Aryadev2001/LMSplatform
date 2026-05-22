@@ -16,6 +16,39 @@ export interface CourseRating {
 
 export const EMPTY_RATING: CourseRating = { avg: 0, count: 0 };
 
+/** 5 buckets: index 0 = 5★ count, index 4 = 1★ count (top-down for UI). */
+export type RatingDistribution = [number, number, number, number, number];
+
+export async function getCourseRatingDistribution(
+  courseId: string,
+): Promise<{ avg: number; count: number; dist: RatingDistribution }> {
+  const rows = await db
+    .select({ rating: courseReviews.rating, n: sql<number>`count(*)::int` })
+    .from(courseReviews)
+    .where(
+      and(
+        eq(courseReviews.courseId, courseId),
+        sql`${courseReviews.hiddenAt} is null`,
+      ),
+    )
+    .groupBy(courseReviews.rating);
+  const dist: RatingDistribution = [0, 0, 0, 0, 0];
+  let total = 0;
+  let weightedSum = 0;
+  for (const r of rows) {
+    const stars = Math.max(1, Math.min(5, r.rating));
+    const n = Number(r.n);
+    dist[5 - stars] = n;
+    total += n;
+    weightedSum += stars * n;
+  }
+  return {
+    avg: total === 0 ? 0 : weightedSum / total,
+    count: total,
+    dist,
+  };
+}
+
 export async function getCourseRating(
   courseId: string,
 ): Promise<CourseRating> {
@@ -25,7 +58,13 @@ export async function getCourseRating(
       count: sql<number>`count(*)::int`,
     })
     .from(courseReviews)
-    .where(eq(courseReviews.courseId, courseId));
+    .where(
+      and(
+        eq(courseReviews.courseId, courseId),
+        // Skip super-admin-moderated reviews from public aggregates.
+        sql`${courseReviews.hiddenAt} is null`,
+      ),
+    );
   return { avg: Number(row?.avg ?? 0), count: Number(row?.count ?? 0) };
 }
 
@@ -72,7 +111,12 @@ export async function listCourseReviews(
     })
     .from(courseReviews)
     .innerJoin(users, eq(users.id, courseReviews.userId))
-    .where(eq(courseReviews.courseId, courseId))
+    .where(
+      and(
+        eq(courseReviews.courseId, courseId),
+        sql`${courseReviews.hiddenAt} is null`,
+      ),
+    )
     .orderBy(desc(courseReviews.createdAt))
     .limit(opts?.limit ?? 20);
   return rows;
@@ -101,6 +145,7 @@ export async function listTenantReviews(
       and(
         eq(courseReviews.tenantId, tenantId),
         eq(programs.tenantId, tenantId),
+        sql`${courseReviews.hiddenAt} is null`,
       ),
     )
     .orderBy(desc(courseReviews.createdAt))

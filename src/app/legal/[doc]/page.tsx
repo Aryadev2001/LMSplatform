@@ -62,6 +62,19 @@ const DOCS: Record<
       { h: "4. Managing cookies", p: "You can control cookies in your browser settings; disabling essential cookies may break sign-in." },
     ],
   },
+  disclaimer: {
+    title: "Learner Disclaimer",
+    eyebrow: "Legal",
+    intro:
+      "Important: outcomes from any course on this marketplace depend on your effort and circumstances.",
+    sections: [
+      { h: "1. Results may vary", p: "Course content on eurodigital.coach is educational. We make no guarantee of specific career, certification, or income outcomes for any individual learner." },
+      { h: "2. Certificates", p: "Course completion certificates are issued by the partner institute, not by eurodigital.coach. Whether a certificate is accredited or recognised externally is a matter for the issuing institute." },
+      { h: "3. Third-party content", p: "Courses are authored by independent partner institutes. The platform vets each institute before publishing but does not warrant the accuracy or completeness of every lesson." },
+      { h: "4. Health, legal, financial advice", p: "No course on this marketplace constitutes medical, legal, financial, or other professional advice. If a course covers those topics, consult a qualified professional before acting on its content." },
+      { h: "5. Acknowledgement", p: "By checking the disclaimer box during signup you confirm you've read this notice." },
+    ],
+  },
 };
 
 export function generateStaticParams() {

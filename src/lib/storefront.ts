@@ -58,6 +58,8 @@ export interface Storefront {
      *  tenant has the white_label feature granted (via tier or override)
      *  AND has actively enabled the hide-platform-logo flag. */
     whiteLabel: boolean;
+    /** Optional URL for the institute intro video shown on the About tab. */
+    introVideoUrl: string | null;
   };
   courses: StorefrontCourse[];
 }
@@ -93,6 +95,7 @@ async function _readStorefront(slug: string): Promise<Storefront | null> {
       ownerPhotoUrl: tenants.ownerPhotoUrl,
       hidePlatformLogo: tenants.hidePlatformLogo,
       featureOverrides: tenants.featureOverrides,
+      introVideoUrl: tenants.introVideoUrl,
     })
     .from(tenants)
     .where(eq(tenants.slug, slug.toLowerCase()))
@@ -194,6 +197,7 @@ async function _readStorefront(slug: string): Promise<Storefront | null> {
       ownerPhotoUrl: tenant.ownerPhotoUrl,
       activeOffers: offerCount,
       whiteLabel,
+      introVideoUrl: tenant.introVideoUrl,
     },
     courses,
   };

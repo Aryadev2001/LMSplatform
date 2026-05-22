@@ -14,6 +14,7 @@ import {
   Library,
   Sparkles,
   UserSquare2,
+  Star,
 } from "lucide-react";
 
 export type DashRole = "admin" | "student" | "super";
@@ -70,6 +71,7 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
     { label: "Tenants", href: "/super-admin/tenants", icon: Building2 },
     { label: "Students", href: "/super-admin/students", icon: GraduationCap },
     { label: "Master Courses", href: "/super-admin/courses", icon: Library },
+    { label: "Reviews", href: "/super-admin/reviews", icon: Star },
     { label: "Payments", href: "/super-admin/payments", icon: CreditCard },
     { label: "Team", href: "/super-admin/team", icon: Users2 },
     { label: "Audit Log", href: "/super-admin/audit", icon: ScrollText },

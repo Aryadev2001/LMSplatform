@@ -212,6 +212,7 @@ export default async function InstituteStorefrontPage({
         tenantName={tenant.name}
         heroTagline={tenant.heroTagline}
         companyProfile={tenant.companyProfile}
+        introVideoUrl={tenant.introVideoUrl}
         owner={{
           name: tenant.ownerName,
           title: tenant.ownerTitle,
