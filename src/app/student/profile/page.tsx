@@ -72,6 +72,7 @@ export default async function StudentProfilePage() {
     termsAccepted: !!st?.termsAcceptedAt,
     disclaimerAccepted: !!st?.disclaimerAcceptedAt,
     complete: !!st?.profileCompletedAt,
+    phoneVerified: !!st?.phoneVerifiedAt,
   };
 
   return (

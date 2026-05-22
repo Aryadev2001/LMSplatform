@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveStudentProfile } from "./actions";
+import { PhoneVerification } from "./phone-verification";
 
 type PaymentMode = "card" | "upi" | "netbanking" | "wallet" | "";
 
@@ -59,6 +60,7 @@ export interface InitialProfile {
   termsAccepted: boolean;
   disclaimerAccepted: boolean;
   complete: boolean;
+  phoneVerified: boolean;
 }
 
 const INCOME_RANGES = [
@@ -161,15 +163,21 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
               className="h-10 rounded-xl"
             />
           </Field>
-          <Field label="Mobile number *">
-            <Input
-              type="tel"
-              value={s.phone}
-              onChange={(e) => set("phone", e.target.value)}
-              placeholder="+91 98765 43210"
-              className="h-10 rounded-xl"
+          <div className="space-y-1.5">
+            <PhoneVerification
+              initialPhone={initial.phone}
+              initialVerified={initial.phoneVerified}
+              onChange={(phone, verified) => {
+                setS((p) => ({
+                  ...p,
+                  phone,
+                  // Re-sync the form's phone-verified flag so the Save
+                  // gate downstream knows the current state.
+                  phoneVerified: verified,
+                }));
+              }}
             />
-          </Field>
+          </div>
         </Row>
         <Row>
           <Field label="Date of birth" optional>

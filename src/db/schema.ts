@@ -584,6 +584,8 @@ export const students = pgTable(
     profileCompletedAt: timestamp("profile_completed_at", {
       withTimezone: true,
     }),
+    // ---- 0017 — Clerk-OTP verified phone ----
+    phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

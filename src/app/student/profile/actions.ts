@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/db/client";
 import { students, users } from "@/db/schema";
 import { getCurrentUser, requireRole } from "@/lib/auth";
@@ -65,6 +66,100 @@ function n(s: string | undefined | null): string | null {
   if (!s) return null;
   const t = s.trim();
   return t.length === 0 ? null : t;
+}
+
+/**
+ * Persist a Clerk-verified phone number to the students row. Called by
+ * the PhoneVerification widget after Clerk reports the OTP succeeded.
+ *
+ * Critically, we DO NOT trust the client's claim that the number is
+ * verified. We re-fetch the Clerk user server-side and confirm that
+ * (a) the phone exists on that user, and (b) Clerk's verification.status
+ * for that phone is "verified". If anything fails the check the row is
+ * not updated and the action returns an error.
+ */
+export async function persistVerifiedPhone(
+  phoneNumber: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  await requireRole("student");
+  const me = await getCurrentUser();
+  if (!me) return { success: false, error: "Sign in first." };
+
+  const trimmed = phoneNumber.trim();
+  if (trimmed.length < 6) {
+    return { success: false, error: "Phone number looks invalid." };
+  }
+
+  // Server-side verification: re-read the Clerk user and confirm the
+  // phone is actually verified there. The client can't lie its way past
+  // this — Clerk is the source of truth.
+  try {
+    const clerk = await clerkClient();
+    const cu = await clerk.users.getUser(me.userId);
+    const pn = cu.phoneNumbers.find((p) => p.phoneNumber === trimmed);
+    if (!pn) {
+      return {
+        success: false,
+        error:
+          "That number isn't attached to your account in Clerk yet — finish the OTP step first.",
+      };
+    }
+    if (pn.verification?.status !== "verified") {
+      return {
+        success: false,
+        error: "Clerk still shows this number as unverified.",
+      };
+    }
+  } catch (e) {
+    return {
+      success: false,
+      error:
+        "Could not confirm verification with Clerk: " +
+        (e instanceof Error ? e.message : "unknown error"),
+    };
+  }
+
+  const [meRow] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, me.userId))
+    .limit(1);
+  if (!meRow) return { success: false, error: "User row not found." };
+
+  const now = new Date();
+  // Idempotent upsert — if no students row exists yet (learner verifies
+  // before they fill the rest of the profile), create one with just the
+  // verified phone.
+  await db
+    .insert(students)
+    .values({
+      userId: meRow.id,
+      phone: trimmed,
+      phoneVerifiedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: students.userId,
+      set: { phone: trimmed, phoneVerifiedAt: now },
+    });
+
+  await recordAudit({
+    action: "student.phone.verified",
+    targetType: "user",
+    targetId: meRow.id,
+    metadata: { phoneHash: hashPhone(trimmed) },
+  });
+
+  revalidatePath("/student/profile");
+  return { success: true };
+}
+
+function hashPhone(phone: string): string {
+  // Audit logs are reviewed by super-admins. We log a short fingerprint
+  // instead of the raw number so an audit-log leak doesn't include PII.
+  let h = 0;
+  for (let i = 0; i < phone.length; i++)
+    h = ((h * 31 + phone.charCodeAt(i)) >>> 0) % 0xffffffff;
+  return h.toString(16).padStart(8, "0");
 }
 
 export async function saveStudentProfile(

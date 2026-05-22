@@ -66,6 +66,7 @@ export default async function SuperStudentsPage({
       tenantName: tenants.name,
       tenantSlug: tenants.slug,
       phone: students.phone,
+      phoneVerifiedAt: students.phoneVerifiedAt,
       paymentMode: students.paymentModePreference,
       whatsappConsent: students.whatsappConsent,
       profileCompletedAt: students.profileCompletedAt,
@@ -159,7 +160,22 @@ export default async function SuperStudentsPage({
                     )}
                   </TableCell>
                   <TableCell className="text-xs">
-                    {r.phone ?? <span className="text-muted-foreground">—</span>}
+                    {r.phone ? (
+                      <div>
+                        <div>{r.phone}</div>
+                        {r.phoneVerifiedAt ? (
+                          <span className="text-[10px] font-semibold text-emerald-600">
+                            ✓ verified
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">
+                            unverified
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {r.profileCompletedAt ? (

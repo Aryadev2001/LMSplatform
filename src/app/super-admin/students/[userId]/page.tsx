@@ -166,7 +166,14 @@ export default async function SuperStudentDetailPage({
             <CardTitle className="text-sm">Personal &amp; contact</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-            <Row label="Mobile" value={st?.phone ?? null} />
+            <Row
+              label="Mobile"
+              value={
+                st?.phone
+                  ? `${st.phone}${st.phoneVerifiedAt ? "  ✓ verified" : "  · unverified"}`
+                  : null
+              }
+            />
             <Row label="Date of birth" value={st?.dateOfBirth ?? null} />
             <Row
               label="Address"
