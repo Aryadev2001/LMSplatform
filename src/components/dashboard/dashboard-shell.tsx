@@ -1,5 +1,5 @@
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { DashboardSidebar } from "./dashboard-sidebar";
+import { DashboardSidebar, type DashboardAccount } from "./dashboard-sidebar";
 import { DashboardTopbar } from "./dashboard-topbar";
 import type { DashRole, FeatureKey, PartnerTier } from "./nav-items";
 
@@ -16,6 +16,8 @@ interface DashboardShellProps {
   tier?: PartnerTier;
   /** Per-feature explicit grants/revokes; beats tier default. */
   featureOverrides?: Partial<Record<FeatureKey, boolean>>;
+  /** Signed-in identity for the sidebar footer (email + Sign Out). */
+  account?: DashboardAccount;
   children: React.ReactNode;
 }
 
@@ -25,6 +27,7 @@ export function DashboardShell({
   brand,
   tier,
   featureOverrides,
+  account,
   children,
 }: DashboardShellProps) {
   return (
@@ -34,6 +37,7 @@ export function DashboardShell({
         brand={brand}
         tier={tier}
         featureOverrides={featureOverrides}
+        account={account}
       />
       <SidebarInset>
         <DashboardTopbar title={title} />

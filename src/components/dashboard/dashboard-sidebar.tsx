@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, LogOut } from "lucide-react";
+import { SignOutButton } from "@clerk/nextjs";
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +27,13 @@ import {
 } from "./nav-items";
 import type { TenantBrand } from "./dashboard-shell";
 
+export interface DashboardAccount {
+  /** Whichever is set, in priority: full name → email. Used as the display
+   *  name; email is shown on its own line below so it's always visible. */
+  displayName: string;
+  email: string;
+}
+
 const TIER_RANK: Record<PartnerTier, number> = {
   basic: 0,
   standard: 1,
@@ -37,6 +45,9 @@ interface DashboardSidebarProps {
   brand?: TenantBrand;
   tier?: PartnerTier;
   featureOverrides?: Partial<Record<FeatureKey, boolean>>;
+  /** Signed-in account info, surfaced in the sidebar footer so users can
+   *  see which session is active and one-click sign out. */
+  account?: DashboardAccount;
 }
 
 export function DashboardSidebar({
@@ -44,6 +55,7 @@ export function DashboardSidebar({
   brand,
   tier,
   featureOverrides,
+  account,
 }: DashboardSidebarProps) {
   const items = NAV_ITEMS[role];
   const activeTier: PartnerTier = tier ?? "basic";
@@ -145,6 +157,34 @@ export function DashboardSidebar({
       </SidebarContent>
 
       <SidebarFooter>
+        {account && (
+          <div className="border-t border-black/5 group-data-[collapsible=icon]:hidden">
+            {/* Signed-in identity — always visible so a stale Clerk session
+                from prior testing can't masquerade as "wrong account". */}
+            <div className="px-3 pt-3">
+              <div
+                className="truncate text-xs font-bold"
+                title={account.displayName}
+              >
+                {account.displayName}
+              </div>
+              <div
+                className="truncate text-[11px] text-muted-foreground"
+                title={account.email}
+              >
+                {account.email}
+              </div>
+            </div>
+            <SignOutButton redirectUrl="/sign-in">
+              <button
+                type="button"
+                className="mt-2 flex w-full items-center gap-1.5 rounded-md px-3 py-1.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                <LogOut className="size-3.5" /> Sign out
+              </button>
+            </SignOutButton>
+          </div>
+        )}
         <div className="px-3 py-3 text-[10px] uppercase tracking-widest text-muted-foreground group-data-[collapsible=icon]:hidden">
           v0.1 · build {new Date().getFullYear()}
         </div>
