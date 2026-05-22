@@ -76,17 +76,31 @@ export async function saveStudentProfile(
 
   const parsed = ProfileSchema.safeParse(input);
   if (!parsed.success) {
-    return {
-      success: false,
-      error: parsed.error.issues[0]?.message ?? "Invalid input",
-    };
+    // Field-named error so the user can see *which* field is wrong instead
+    // of a generic "Invalid input" toast they'll dismiss without action.
+    const issue = parsed.error.issues[0];
+    const path = issue?.path?.join(".") || "form";
+    const msg = issue?.message ?? "Invalid value";
+    console.warn(
+      `[saveStudentProfile] zod-rejected — ${path}: ${msg}`,
+      parsed.error.issues,
+    );
+    return { success: false, error: `${path}: ${msg}` };
   }
   const d = parsed.data;
 
-  if (!d.termsAccepted || !d.disclaimerAccepted) {
+  if (!d.termsAccepted) {
     return {
       success: false,
-      error: "You must accept the terms and disclaimer to continue.",
+      error:
+        "termsAccepted: please check 'I have read and accept the Terms & Conditions' at the bottom of the form.",
+    };
+  }
+  if (!d.disclaimerAccepted) {
+    return {
+      success: false,
+      error:
+        "disclaimerAccepted: please check 'I acknowledge the learner disclaimer' at the bottom of the form.",
     };
   }
 

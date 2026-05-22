@@ -3,7 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, User, Briefcase, Wallet, Shield } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  User,
+  Briefcase,
+  Wallet,
+  Shield,
+  AlertCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +73,9 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [s, setS] = useState<InitialProfile>(initial);
+  // Persistent error banner. Toasts fade in ~3s and learners were missing
+  // them — this stays visible until the next save attempt clears it.
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   function set<K extends keyof InitialProfile>(k: K, v: InitialProfile[K]) {
     setS((p) => ({ ...p, [k]: v }));
@@ -89,10 +100,26 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
   }
 
   function onSave() {
-    if (!s.termsAccepted || !s.disclaimerAccepted) {
-      toast.error("Accept the terms and disclaimer to continue.");
+    setErrorMsg(null);
+
+    // Client-side pre-flight — surface required-field issues inline before
+    // we even hit the server, so the user sees exactly what's missing.
+    const reasons: string[] = [];
+    if (s.fullName.trim().length < 2)
+      reasons.push("Full name (at least 2 characters)");
+    if (s.phone.trim().length < 6)
+      reasons.push("Mobile number (at least 6 digits)");
+    if (!s.termsAccepted)
+      reasons.push("Terms & Conditions checkbox at the bottom");
+    if (!s.disclaimerAccepted)
+      reasons.push("Learner Disclaimer checkbox at the bottom");
+    if (reasons.length > 0) {
+      const msg = `Please fix: ${reasons.join(" · ")}`;
+      setErrorMsg(msg);
+      toast.error(msg);
       return;
     }
+
     startTransition(async () => {
       const r = await saveStudentProfile({
         fullName: s.fullName,
@@ -111,9 +138,11 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
         disclaimerAccepted: s.disclaimerAccepted,
       });
       if (!r.success) {
+        setErrorMsg(r.error);
         toast.error(r.error);
         return;
       }
+      setErrorMsg(null);
       toast.success("Profile saved");
       router.refresh();
     });
@@ -124,7 +153,7 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
       {/* Personal */}
       <Section icon={User} title="Personal details">
         <Row>
-          <Field label="Full name (as on ID)">
+          <Field label="Full name (as on ID) *">
             <Input
               value={s.fullName}
               onChange={(e) => set("fullName", e.target.value)}
@@ -132,7 +161,7 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
               className="h-10 rounded-xl"
             />
           </Field>
-          <Field label="Mobile number">
+          <Field label="Mobile number *">
             <Input
               type="tel"
               value={s.phone}
@@ -377,6 +406,25 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
         </label>
       </Section>
 
+      {/* Persistent error banner — doesn't fade away like a toast. */}
+      {errorMsg && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl border p-4 text-sm"
+          style={{
+            borderColor: "#fecaca",
+            background: "#fef2f2",
+            color: "#991b1b",
+          }}
+        >
+          <AlertCircle className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <div className="font-bold">Couldn&apos;t save your profile</div>
+            <p className="mt-0.5 break-words">{errorMsg}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs text-muted-foreground">
           {initial.complete ? (
@@ -386,8 +434,8 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
             </span>
           ) : (
             <span>
-              Required before you can purchase a paid course. You can come
-              back and edit anything later.
+              <strong className="text-foreground">Required (*):</strong> full
+              name, mobile, T&amp;C, disclaimer. Everything else is optional.
             </span>
           )}
         </div>
