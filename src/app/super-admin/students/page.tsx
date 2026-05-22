@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -94,7 +94,7 @@ export default async function SuperStudentsPage({
       <PageHeader
         eyebrow="— Students"
         title="Cross-tenant students"
-        description="Every learner across every tenant — read-only. Click a row to view their full profile + payment history."
+        description="Every learner across every tenant — read-only. Click a name (or the View column) to open the full profile: personal, professional, financial, enrollments, and per-payment history."
       />
 
       <div className="mb-4">
@@ -113,13 +113,14 @@ export default async function SuperStudentsPage({
               <TableHead>Paid courses</TableHead>
               <TableHead className="text-right">Lifetime spend</TableHead>
               <TableHead className="text-right">Joined</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={9}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
                   {search
@@ -193,6 +194,15 @@ export default async function SuperStudentsPage({
                   </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground">
                     {formatDate(r.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link
+                      href={`/super-admin/students/${r.id}`}
+                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-secondary"
+                    >
+                      View
+                      <ArrowRight className="size-3" />
+                    </Link>
                   </TableCell>
                 </TableRow>
               );
