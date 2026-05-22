@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
-import { programs, modules, lessons, exams, examQuestions } from "@/db/schema";
+import {
+  programs,
+  modules,
+  lessons,
+  exams,
+  examQuestions,
+  courseOffers,
+} from "@/db/schema";
 import { eq, and, asc, inArray, desc, sql } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
@@ -12,6 +19,7 @@ import { formatInr } from "@/lib/courses";
 import { ModuleDialog, DeleteModuleButton, DeleteLessonButton } from "./module-dialog";
 import { LessonDialog } from "./lesson-dialog";
 import { ExamDialog, DeleteExamButton } from "./exam-dialog";
+import { OfferDialog, DeleteOfferButton } from "./offer-dialog";
 import {
   ArrowLeft,
   PlayCircle,
@@ -20,6 +28,7 @@ import {
   ClipboardList,
   Clock,
   Layers,
+  Tag,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +86,25 @@ export default async function CourseContentPage({
     .orderBy(desc(exams.createdAt));
   const moduleOptions = mods.map((m) => ({ id: m.id, title: m.title }));
   const moduleTitleById = new Map(mods.map((m) => [m.id, m.title] as const));
+
+  // Offers attached to this course (any active state).
+  const offerRows = await db
+    .select({
+      id: courseOffers.id,
+      type: courseOffers.type,
+      valueInt: courseOffers.valueInt,
+      voucherCode: courseOffers.voucherCode,
+      maxRedemptions: courseOffers.maxRedemptions,
+      redemptionsUsed: courseOffers.redemptionsUsed,
+      startsAt: courseOffers.startsAt,
+      expiresAt: courseOffers.expiresAt,
+      isActive: courseOffers.isActive,
+    })
+    .from(courseOffers)
+    .where(
+      and(eq(courseOffers.programId, id), eq(courseOffers.tenantId, tenantId)),
+    )
+    .orderBy(desc(courseOffers.createdAt));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -287,6 +315,142 @@ export default async function CourseContentPage({
                       }}
                     />
                     <DeleteExamButton examId={ex.id} courseId={course.id} />
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Offers — reward points / percentage discounts / voucher codes. */}
+      <div>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              — Offers &amp; vouchers
+            </div>
+            <h2 className="mt-1 text-xl font-extrabold tracking-tight">
+              Offers ({offerRows.length})
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Reward points granted on purchase, automatic % discounts, or
+              voucher codes a buyer enters at checkout.
+            </p>
+          </div>
+          <OfferDialog courseId={course.id} mode="create" />
+        </div>
+
+        {offerRows.length === 0 ? (
+          <Card className="border-dashed bg-transparent p-10 text-center shadow-none">
+            <Tag className="mx-auto size-8 text-muted-foreground" />
+            <p className="mt-3 text-sm font-medium">No offers yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Add a launch-week voucher or set a permanent points reward to
+              attract enrollments.
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {offerRows.map((o) => {
+              const typeLabel =
+                o.type === "voucher_code"
+                  ? "Voucher"
+                  : o.type === "reward_percentage"
+                    ? "Auto discount"
+                    : "Reward points";
+              const valueLabel =
+                o.type === "reward_points"
+                  ? `${o.valueInt} pts`
+                  : `${o.valueInt}%`;
+              const expired = o.expiresAt && o.expiresAt < new Date();
+              const notYet = o.startsAt && o.startsAt > new Date();
+              const exhausted =
+                o.maxRedemptions !== null &&
+                o.redemptionsUsed >= o.maxRedemptions;
+              const statusLabel = !o.isActive
+                ? "Disabled"
+                : expired
+                  ? "Expired"
+                  : notYet
+                    ? "Scheduled"
+                    : exhausted
+                      ? "Exhausted"
+                      : "Live";
+              const statusVariant: "default" | "secondary" | "destructive" =
+                statusLabel === "Live"
+                  ? "default"
+                  : statusLabel === "Disabled" || statusLabel === "Expired"
+                    ? "secondary"
+                    : "secondary";
+              return (
+                <Card
+                  key={o.id}
+                  className="flex flex-wrap items-center justify-between gap-3 border-none bg-card p-4 shadow-card sm:flex-nowrap"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold">{typeLabel}</span>
+                      <span
+                        className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs"
+                        style={{ color: "var(--ed-ink)" }}
+                      >
+                        {valueLabel}
+                      </span>
+                      {o.voucherCode && (
+                        <span
+                          className="rounded-md bg-secondary px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider"
+                          style={{ color: "var(--ed-ink)" }}
+                        >
+                          {o.voucherCode}
+                        </span>
+                      )}
+                      <Badge variant={statusVariant} className="font-normal">
+                        {statusLabel}
+                      </Badge>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>
+                        Redemptions:{" "}
+                        <strong className="text-foreground">
+                          {o.redemptionsUsed}
+                        </strong>
+                        {o.maxRedemptions !== null
+                          ? ` / ${o.maxRedemptions}`
+                          : ""}
+                      </span>
+                      {o.startsAt && (
+                        <span>
+                          Starts {o.startsAt.toISOString().slice(0, 10)}
+                        </span>
+                      )}
+                      {o.expiresAt && (
+                        <span>
+                          Expires {o.expiresAt.toISOString().slice(0, 10)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <OfferDialog
+                      courseId={course.id}
+                      mode="edit"
+                      initial={{
+                        id: o.id,
+                        type: o.type,
+                        valueInt: o.valueInt,
+                        voucherCode: o.voucherCode,
+                        maxRedemptions: o.maxRedemptions,
+                        startsAt: o.startsAt
+                          ? o.startsAt.toISOString()
+                          : null,
+                        expiresAt: o.expiresAt
+                          ? o.expiresAt.toISOString()
+                          : null,
+                        isActive: o.isActive,
+                      }}
+                    />
+                    <DeleteOfferButton offerId={o.id} courseId={course.id} />
                   </div>
                 </Card>
               );

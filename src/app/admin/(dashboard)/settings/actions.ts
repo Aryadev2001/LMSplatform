@@ -6,7 +6,7 @@ import { db } from "@/db/client";
 import { users, tenants, tierRewards, programs } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireTenantId } from "@/lib/tenant";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireRole, getCurrentUser, CANONICAL_ADMIN } from "@/lib/auth";
 import { ADMIN_PERMISSIONS, type AdminPermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
@@ -232,6 +232,10 @@ export async function updateMyTenantBranding(
 
   revalidatePath("/admin/settings");
   revalidatePath("/", "layout");
+  // Branding changes show in the storefront immediately rather than
+  // up to 60s later.
+  revalidateTag("tenant", "default");
+  revalidateTag("marketplace", "default");
   return { success: true };
 }
 
@@ -267,6 +271,7 @@ export async function setWhiteLabelActive(
   });
   revalidatePath("/admin/settings");
   revalidatePath("/", "layout");
+  revalidateTag("tenant", "default");
   return { success: true };
 }
 

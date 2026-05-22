@@ -8,12 +8,14 @@ import {
   students,
   carts,
   users,
+  programs,
 } from "@/db/schema";
 import {
   redeemPointsAtCheckout,
   awardReferralForPurchase,
 } from "@/lib/referral";
 import { createInvoiceForOrder } from "@/lib/payments/invoice";
+import { sendEmail } from "@/lib/email";
 
 /**
  * Grant access for a paid order. THE single fulfilment path — the mock and
@@ -76,6 +78,17 @@ export async function fulfillOrderById(
     .where(eq(users.id, order.userId))
     .limit(1);
   if (!dbUser) return { ok: false, error: "Buyer account missing." };
+
+  // Snapshot whether this is the learner's first paid enrollment BEFORE we
+  // create the new rows — checking after would always be false (the new
+  // rows would themselves count). Used at the end to send the welcome
+  // email exactly once per learner lifetime.
+  const priorEnrollments = await db
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .where(eq(enrollments.userId, dbUser.id))
+    .limit(1);
+  const isFirstPurchase = priorEnrollments.length === 0;
 
   const its = await db
     .select({
@@ -228,6 +241,36 @@ export async function fulfillOrderById(
     await createInvoiceForOrder(order.id);
   } catch {
     /* non-critical to access; reconcile/replay will re-attempt */
+  }
+
+  // Welcome email — only on the learner's FIRST paid enrollment, using the
+  // pre-fulfilment snapshot. Best-effort (the seam just logs today; swap to
+  // a real provider in src/lib/email.ts).
+  if (isFirstPurchase && dbUser.email) {
+    try {
+      const firstItem = its[0];
+      const [course] = firstItem
+        ? await db
+            .select({ name: programs.name, slug: programs.slug })
+            .from(programs)
+            .where(eq(programs.id, firstItem.programId))
+            .limit(1)
+        : [];
+      const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
+      await sendEmail({
+        to: dbUser.email,
+        template: "dashboard_unlocked",
+        data: {
+          learnerName: dbUser.fullName ?? dbUser.email.split("@")[0],
+          courseName: course?.name ?? firstItem?.title ?? "your course",
+          courseUrl: course?.slug ? `${base}/courses/${course.slug}` : null,
+          dashboardUrl: `${base}/student`,
+          orderRef: order.orderRef,
+        },
+      });
+    } catch {
+      /* email is non-critical; never block access on it */
+    }
   }
 
   return {

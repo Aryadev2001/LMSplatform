@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { programs, students, users, tenants } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireRole, isStudentRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { recordAudit } from "@/lib/audit";
@@ -114,6 +114,13 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
   });
   await autoSyncPlan(tenantId, row.id);
   revalidatePath("/admin/programs");
+  // Flush cached marketplace + course-detail reads so changes show up
+  // instantly on /, /explore, /courses/<slug>, /institute/<slug>.
+  // Next 16 requires a cache-profile arg; "default" matches the
+  // unstable_cache defaults.
+  revalidateTag("course", "default");
+  revalidateTag("marketplace", "default");
+  revalidateTag("tenant", "default");
   return { success: true, id: row.id };
 }
 
@@ -164,6 +171,13 @@ export async function updateProgram(
   });
   await autoSyncPlan(tenantId, id);
   revalidatePath("/admin/programs");
+  // Flush cached marketplace + course-detail reads so changes show up
+  // instantly on /, /explore, /courses/<slug>, /institute/<slug>.
+  // Next 16 requires a cache-profile arg; "default" matches the
+  // unstable_cache defaults.
+  revalidateTag("course", "default");
+  revalidateTag("marketplace", "default");
+  revalidateTag("tenant", "default");
   return { success: true, id };
 }
 
@@ -181,6 +195,13 @@ export async function syncProgramGateway(
     metadata: { ok: r.ok, ...(r.ok ? {} : { error: r.error }) },
   });
   revalidatePath("/admin/programs");
+  // Flush cached marketplace + course-detail reads so changes show up
+  // instantly on /, /explore, /courses/<slug>, /institute/<slug>.
+  // Next 16 requires a cache-profile arg; "default" matches the
+  // unstable_cache defaults.
+  revalidateTag("course", "default");
+  revalidateTag("marketplace", "default");
+  revalidateTag("tenant", "default");
   return r.ok ? { success: true } : { success: false, error: r.error };
 }
 
@@ -198,6 +219,13 @@ export async function toggleProgramActive(id: string, isActive: boolean) {
     metadata: { tenantId, isActive },
   });
   revalidatePath("/admin/programs");
+  // Flush cached marketplace + course-detail reads so changes show up
+  // instantly on /, /explore, /courses/<slug>, /institute/<slug>.
+  // Next 16 requires a cache-profile arg; "default" matches the
+  // unstable_cache defaults.
+  revalidateTag("course", "default");
+  revalidateTag("marketplace", "default");
+  revalidateTag("tenant", "default");
   return { success: true as const };
 }
 

@@ -12,7 +12,11 @@ export type EmailTemplate =
   | "tier_upgraded"
   | "points_expiring"
   | "tenant_invite"
-  | "domain_configured";
+  | "domain_configured"
+  /** Sent the first time a learner pays for any course. Confirms dashboard
+   *  access is unlocked. Data: { learnerName, courseName, courseUrl,
+   *  dashboardUrl, orderRef }. */
+  | "dashboard_unlocked";
 
 export interface SendEmailInput {
   to: string;

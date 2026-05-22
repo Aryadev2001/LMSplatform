@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { db } from "@/db/client";
-import { users } from "@/db/schema";
+import { users, students } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
@@ -15,11 +16,25 @@ export default async function CheckoutPage() {
   let points = 0;
   if (me) {
     const [u] = await db
-      .select({ points: users.pointsBalance })
+      .select({ id: users.id, points: users.pointsBalance })
       .from(users)
       .where(eq(users.clerkId, me.userId))
       .limit(1);
     points = u?.points ?? 0;
+
+    // Profile-required gate. A student MUST complete /student/profile
+    // before paying. Super-admins / partner-admins (impersonating or
+    // otherwise) bypass — they're testing, not enrolling.
+    if (u && me.role === "student") {
+      const [st] = await db
+        .select({ profileCompletedAt: students.profileCompletedAt })
+        .from(students)
+        .where(eq(students.userId, u.id))
+        .limit(1);
+      if (!st?.profileCompletedAt) {
+        redirect("/student/profile?required=1&returnTo=/checkout");
+      }
+    }
   }
 
   return (

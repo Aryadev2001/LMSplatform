@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { clerkClient } from "@clerk/nextjs/server";
@@ -278,6 +278,10 @@ export async function updateTenant(input: unknown): Promise<Result> {
 
   revalidatePath(`/super-admin/tenants/${d.tenantId}`);
   revalidatePath("/super-admin/tenants");
+  // Status / tier / feature-override changes affect public marketplace +
+  // storefront caches — flush so visitors see them immediately.
+  revalidateTag("tenant", "default");
+  revalidateTag("marketplace", "default");
   return { success: true };
 }
 
