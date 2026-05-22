@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   and,
   desc,
@@ -53,32 +54,42 @@ const liveCourseWhere = and(
   ne(tenants.status, "SUSPENDED"),
 );
 
-export async function getMarketStats(): Promise<{
-  courses: number;
-  institutes: number;
-  learners: number;
-}> {
-  const [[c], [i], [l]] = await Promise.all([
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(programs)
-      .innerJoin(tenants, eq(tenants.id, programs.tenantId))
-      .where(liveCourseWhere),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(tenants)
-      .where(ne(tenants.status, "SUSPENDED")),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(users)
-      .where(sql`role in ('student','STUDENT','coach')`),
-  ]);
-  return {
-    courses: c?.n ?? 0,
-    institutes: i?.n ?? 0,
-    learners: l?.n ?? 0,
-  };
-}
+/**
+ * Cached on the platform — the home + explore + every public page reads
+ * these numbers, so we serve them from Vercel's data cache for 60 seconds
+ * before going back to Neon. A new course / institute is visible within
+ * a minute, which is fine for marketing copy.
+ */
+export const getMarketStats = unstable_cache(
+  async (): Promise<{
+    courses: number;
+    institutes: number;
+    learners: number;
+  }> => {
+    const [[c], [i], [l]] = await Promise.all([
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(programs)
+        .innerJoin(tenants, eq(tenants.id, programs.tenantId))
+        .where(liveCourseWhere),
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(tenants)
+        .where(ne(tenants.status, "SUSPENDED")),
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(users)
+        .where(sql`role in ('student','STUDENT','coach')`),
+    ]);
+    return {
+      courses: c?.n ?? 0,
+      institutes: i?.n ?? 0,
+      learners: l?.n ?? 0,
+    };
+  },
+  ["market-stats"],
+  { revalidate: 60, tags: ["marketplace"] },
+);
 
 export type CourseLevel = "low" | "mid" | "high";
 export type CoursePriceBucket = "free" | "paid" | "under50" | "50_200";
@@ -236,24 +247,35 @@ export async function getRelatedCourses(
     .limit(limit);
 }
 
-export async function getFeaturedInstitutes(
+/**
+ * Cached 60s for the same reason as getMarketStats — featured institute
+ * cards on the home page should not requery on every page view.
+ */
+const _getFeaturedInstitutes = unstable_cache(
+  async (limit: number): Promise<MarketInstitute[]> => {
+    const rows = await db
+      .select({
+        slug: tenants.slug,
+        name: tenants.name,
+        logoUrl: tenants.logoUrl,
+        heroTagline: tenants.heroTagline,
+        courseCount: sql<number>`(
+          select count(*)::int from ${programs} p
+          where p.tenant_id = ${tenants.id}
+            and p.status = 'published' and p.is_active = true
+        )`,
+      })
+      .from(tenants)
+      .where(ne(tenants.status, "SUSPENDED"))
+      .orderBy(desc(tenants.createdAt))
+      .limit(limit);
+    return rows;
+  },
+  ["featured-institutes"],
+  { revalidate: 60, tags: ["marketplace"] },
+);
+export function getFeaturedInstitutes(
   limit = 8,
 ): Promise<MarketInstitute[]> {
-  const rows = await db
-    .select({
-      slug: tenants.slug,
-      name: tenants.name,
-      logoUrl: tenants.logoUrl,
-      heroTagline: tenants.heroTagline,
-      courseCount: sql<number>`(
-        select count(*)::int from ${programs} p
-        where p.tenant_id = ${tenants.id}
-          and p.status = 'published' and p.is_active = true
-      )`,
-    })
-    .from(tenants)
-    .where(ne(tenants.status, "SUSPENDED"))
-    .orderBy(desc(tenants.createdAt))
-    .limit(limit);
-  return rows;
+  return _getFeaturedInstitutes(limit);
 }
