@@ -36,6 +36,11 @@ const isPublicRoute = createRouteMatcher([
   // Upload route does its OWN admin check inside the handler. Excluded from
   // the middleware redirect so a streamed POST body is never intercepted.
   "/api/blob/upload",
+  // SEO surfaces — crawlers are anonymous; without these the middleware
+  // 307-bounces them to /sign-in and Google never indexes the site.
+  "/robots.txt",
+  "/sitemap.xml",
+  "/favicon.ico",
 ]);
 
 // /super-admin uses the same dedicated console login as /admin.
