@@ -43,7 +43,7 @@ export default function OnboardingPage() {
           </CardTitle>
           <CardDescription>
             You&apos;re signed in but we don&apos;t have your profile yet.
-            Complete it once, then enrol in any course — paid or free — without
+            Complete it once, then enroll in any course — paid or free — without
             re-entering your details.
           </CardDescription>
         </CardHeader>

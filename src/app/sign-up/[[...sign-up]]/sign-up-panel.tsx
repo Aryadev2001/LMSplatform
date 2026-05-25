@@ -133,7 +133,7 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
                   T&amp;C consent, optional professional info.
                 </li>
                 <li>
-                  <strong>Enrol in a course</strong> from the marketplace.
+                  <strong>Enroll in a course</strong> from the marketplace.
                 </li>
                 <li>
                   Your <strong>dashboard unlocks</strong> automatically once

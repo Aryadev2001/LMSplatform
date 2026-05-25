@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTransition } from "react";
-import { ArrowRight, CheckCircle2, LogIn, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCart, type CartItem } from "@/lib/cart";
 
@@ -79,20 +79,19 @@ export function EnrollNowButton({
     );
   }
 
-  // 3. Anonymous → sign-in, then back here. Using Clerk's `redirect_url`
-  // honours our middleware so the user lands on this exact page post-auth
-  // (and can then click the CTA again, this time in the buy branch).
+  // 3. Anonymous → legacy /enroll funnel (one-form name+email → instant
+  // magic-link account → course in dashboard). It's a much smoother shape
+  // than a Clerk sign-up detour for a $0 starter or first-time visitor.
+  // The legacy flow itself guards against signed-in users to avoid the
+  // ghost-account hazard.
   if (!isSignedIn) {
-    const returnTo = `/courses/${slug}`;
-    const signInHref = `/sign-up?redirect_url=${encodeURIComponent(returnTo)}`;
     return (
       <Link
-        href={signInHref}
+        href={`/enroll?course=${slug}`}
         className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
         style={{ background: "var(--ed-gradient)" }}
       >
-        <LogIn className="size-4" />
-        Sign in to enroll
+        {ctaLabel ?? "Enroll now"}
         <ArrowRight className="size-4" />
       </Link>
     );

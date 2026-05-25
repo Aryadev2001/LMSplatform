@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { db } from "@/db/client";
 import { programs } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getTenantFromRequest } from "@/lib/tenant";
+import { getCurrentUser } from "@/lib/auth";
 import { Brand } from "@/components/brand";
 import { EnrollmentForm } from "./enrollment-form";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Enroll — eurodigital.coach",
-  description: "Enrol in an eurodigital.coach program. Pay once, get instant magic-link access.",
+  description: "Enroll in an eurodigital.coach program. Pay once, get instant magic-link access.",
 };
 
 export default async function EnrollPage({
@@ -22,6 +24,15 @@ export default async function EnrollPage({
   searchParams: Promise<{ course?: string; ref?: string }>;
 }) {
   const { course: courseParam, ref: refCode } = await searchParams;
+
+  // Signed-in users do NOT belong on this anonymous funnel — it asks for
+  // email/name again and risks attaching the enrollment to a different
+  // Clerk user (the "ghost-account" class of bug). Send them straight to
+  // the course detail page so EnrollNowButton can dispatch them correctly.
+  const me = await getCurrentUser();
+  if (me) {
+    redirect(courseParam ? `/courses/${courseParam}` : "/explore");
+  }
 
   // Resolve the course within the HOST tenant only — a tenant site can never
   // surface another tenant's course via ?course= (spec invariant #12).
@@ -66,7 +77,7 @@ export default async function EnrollPage({
             — Enrollment
           </div>
           <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tighter md:text-5xl">
-            Enrol in{" "}
+            Enroll in{" "}
             <span className="text-brand-gradient">{selected?.name ?? "your program"}</span>
           </h1>
           <p className="mt-4 max-w-md text-balance text-muted-foreground md:text-lg">

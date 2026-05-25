@@ -137,7 +137,7 @@ export default async function StudentExamIntroPage({
           >
             the course page
           </Link>{" "}
-          to enrol.
+          to enroll.
         </Card>
       )}
 
@@ -202,7 +202,7 @@ export default async function StudentExamIntroPage({
               disabled={!enr || !exam.isActive || qCount === 0}
               disabledReason={
                 !enr
-                  ? "Enrol first"
+                  ? "Enroll first"
                   : !exam.isActive
                     ? "Exam not active"
                     : qCount === 0

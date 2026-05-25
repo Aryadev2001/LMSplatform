@@ -120,7 +120,7 @@ export default async function StudentDashboard() {
                 style={{ color: "var(--ed-ink-2)" }}
               >
                 We need a few details (mobile, T&amp;C consent, optional
-                professional info) before you can enrol in a paid course.
+                professional info) before you can enroll in a paid course.
                 Takes about a minute.
               </div>
             </div>

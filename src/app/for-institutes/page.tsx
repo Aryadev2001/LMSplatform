@@ -20,7 +20,7 @@ const STEPS = [
   { icon: Palette, t: "Brand it", d: "Your logo and colours — the storefront is auto-generated for you." },
   { icon: Upload, t: "Upload courses", d: "Free or paid. Modules, lessons, video — publish when ready." },
   { icon: CreditCard, t: "Connect payouts", d: "Your own Stripe or Razorpay. Money lands directly in your account." },
-  { icon: Rocket, t: "Go live", d: "Students discover, enrol, learn, and earn verifiable certificates." },
+  { icon: Rocket, t: "Go live", d: "Students discover, enroll, learn, and earn verifiable certificates." },
   { icon: BarChart3, t: "Grow", d: "Reward points, referrals and AI add-ons drive repeat learners." },
 ];
 

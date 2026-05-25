@@ -176,7 +176,7 @@ export default async function ExplorePage({
                 className="mt-0.5 text-xs"
                 style={{ color: "var(--ed-ink-2)" }}
               >
-                Browse below, enrol in any course, and your full dashboard
+                Browse below, enroll in any course, and your full dashboard
                 (My Courses, Reviews, Certificates) opens up automatically.
               </p>
             </div>

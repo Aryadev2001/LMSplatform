@@ -107,7 +107,7 @@ export async function startAttempt(examId: string): Promise<StartResult> {
   if (!enrollmentId) {
     return {
       success: false,
-      error: "Enrol in this course before attempting its exam.",
+      error: "Enroll in this course before attempting its exam.",
     };
   }
 

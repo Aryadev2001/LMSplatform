@@ -260,7 +260,7 @@ export default async function StudentCourseDeliveryPage({
           </div>
         ) : (
           <div className="mb-6 rounded-xl border border-dashed p-4 text-xs text-muted-foreground">
-            Enrol in this course to leave a review.
+            Enroll in this course to leave a review.
           </div>
         )}
 

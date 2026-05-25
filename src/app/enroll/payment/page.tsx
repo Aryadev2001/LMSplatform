@@ -52,6 +52,7 @@ export default async function PaymentPage({
   if (!course) notFound();
 
   const amount = formatInr(course.priceCents);
+  const isFree = course.priceCents === 0;
 
   // Returning buyer with a points balance → offer redemption (no negative order).
   const tenant = await getTenantFromRequest();
@@ -91,16 +92,18 @@ export default async function PaymentPage({
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <div className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-            Step 2 of 2 — Secure checkout
+            {isFree ? "Step 2 of 2 — Confirm" : "Step 2 of 2 — Secure checkout"}
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Complete your payment</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isFree ? "Confirm your free enrollment" : "Complete your payment"}
+          </h1>
         </div>
 
         <Card className="border-none bg-card p-6 shadow-soft">
           {/* Order summary */}
           <div className="rounded-xl bg-secondary/50 p-4">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              Order summary
+              {isFree ? "Course" : "Order summary"}
             </div>
             <div className="mt-2 flex items-start justify-between gap-4">
               <div>
@@ -108,36 +111,41 @@ export default async function PaymentPage({
                 <div className="text-xs text-muted-foreground">{course.tagline}</div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-bold">{amount}</div>
-                <div className="text-[10px] text-muted-foreground">
-                  {course.type === "subscription" ? "per quarter" : "one-time"}
-                </div>
+                <div className="text-lg font-bold">{isFree ? "Free" : amount}</div>
+                {!isFree && (
+                  <div className="text-[10px] text-muted-foreground">
+                    {course.type === "subscription" ? "per quarter" : "one-time"}
+                  </div>
+                )}
               </div>
             </div>
             <div className="mt-3 border-t border-black/5 pt-3 text-xs text-muted-foreground">
-              Billed to <span className="font-medium text-foreground">{enr.email}</span>
+              {isFree ? "Account for" : "Billed to"}{" "}
+              <span className="font-medium text-foreground">{enr.email}</span>
             </div>
           </div>
 
-          {/* Mock card panel */}
-          <div className="mt-4 rounded-xl border border-black/8 p-4">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <CreditCard className="size-3.5" /> Test payment (Stripe/Razorpay coming soon)
-            </div>
-            <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-              <div className="rounded-lg border border-dashed border-black/10 px-3 py-2">
-                Card · 4242 4242 4242 4242
+          {/* Mock card panel — only for paid courses */}
+          {!isFree && (
+            <div className="mt-4 rounded-xl border border-black/8 p-4">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <CreditCard className="size-3.5" /> Test payment (Stripe/Razorpay coming soon)
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
                 <div className="rounded-lg border border-dashed border-black/10 px-3 py-2">
-                  12 / 34
+                  Card · 4242 4242 4242 4242
                 </div>
-                <div className="rounded-lg border border-dashed border-black/10 px-3 py-2">
-                  CVC 123
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-dashed border-black/10 px-3 py-2">
+                    12 / 34
+                  </div>
+                  <div className="rounded-lg border border-dashed border-black/10 px-3 py-2">
+                    CVC 123
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="mt-5">
             <PayButton
@@ -146,6 +154,7 @@ export default async function PaymentPage({
               email={enr.email}
               referralCode={ref ?? null}
               redeem={redeem}
+              isFree={isFree}
             />
           </div>
         </Card>

@@ -116,8 +116,8 @@ export function StorefrontBody({
       a: `${tenantName} is a verified institute on eurodigital.coach offering the courses listed here.`,
     },
     {
-      q: "How do I enrol?",
-      a: "Open any course, choose Enrol now or add it to your cart, and check out. Access is granted instantly.",
+      q: "How do I enroll?",
+      a: "Open any course, choose Enroll now or add it to your cart, and check out. Access is granted instantly.",
     },
     {
       q: "Do I get a certificate?",
@@ -834,7 +834,7 @@ function CourseCard({
             style={{ color: "var(--brand-primary)" }}
           >
             <Sparkles className="size-3.5" />
-            Enrol
+            Enroll
           </span>
         </div>
       </div>

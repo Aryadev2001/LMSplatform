@@ -79,7 +79,7 @@ export default async function StudentProfilePage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
         title="Your profile"
-        description="Personal, professional and billing info we use to enrol you in courses, issue certificates and send updates. Fill it in once — required for paid enrolments."
+        description="Personal, professional and billing info we use to enroll you in courses, issue certificates and send updates. Fill it in once — required for paid enrollments."
       />
       <StudentProfileForm initial={initial} />
     </div>

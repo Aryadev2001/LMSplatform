@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Lock } from "lucide-react";
+import { Loader2, Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { completeMockPayment } from "../actions";
@@ -14,12 +14,15 @@ export function PayButton({
   email,
   referralCode,
   redeem,
+  isFree,
 }: {
   enrollmentId: string;
   amountLabel: string;
   email: string;
   referralCode?: string | null;
   redeem?: { points: number; discountLabel: string; netLabel: string } | null;
+  /** Free course — hide the card UI + the "Pay" wording. */
+  isFree?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -68,7 +71,13 @@ export function PayButton({
       >
         {pending ? (
           <>
-            <Loader2 className="size-4 animate-spin" /> Processing payment…
+            <Loader2 className="size-4 animate-spin" />
+            {isFree ? "Enrolling…" : "Processing payment…"}
+          </>
+        ) : isFree ? (
+          <>
+            <Sparkles className="size-4" />
+            Complete free enrollment
           </>
         ) : (
           <>
@@ -78,7 +87,9 @@ export function PayButton({
         )}
       </Button>
       <p className="text-center text-[11px] text-muted-foreground">
-        Test mode — no real charge. Access for {email} is granted instantly on success.
+        {isFree
+          ? `Access for ${email} is granted instantly. Magic-link sign-in emailed.`
+          : `Test mode — no real charge. Access for ${email} is granted instantly on success.`}
       </p>
     </div>
   );

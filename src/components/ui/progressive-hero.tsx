@@ -122,7 +122,7 @@ export function ProgressiveHero({
         <p className="mx-auto mt-5 max-w-2xl text-balance text-base leading-relaxed text-white/65 md:text-lg">
           A global learning marketplace — courses from verified institutes,
           recognised certificates, and rewards as you grow. Start free; pay
-          only when you enrol in a paid course.
+          only when you enroll in a paid course.
         </p>
 
         {/* Primary LMS action — search */}

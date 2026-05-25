@@ -9,8 +9,8 @@ export const metadata = { title: "Help center — eurodigital.coach" };
 
 const LEARNERS = [
   {
-    q: "How do I enrol in a course?",
-    a: "Open any course, add it to your cart and check out. Paid courses use the institute's payment gateway; free courses enrol you instantly with no payment.",
+    q: "How do I enroll in a course?",
+    a: "Open any course, add it to your cart and check out. Paid courses use the institute's payment gateway; free courses enroll you instantly with no payment.",
   },
   {
     q: "Can I pay with reward points?",
@@ -33,7 +33,7 @@ const INSTITUTES = [
   },
   {
     q: "How do I upload a free course?",
-    a: "Institute dashboard → Programs → New program → set Price to 0 → Save → Publish. Students can then enrol with zero payment.",
+    a: "Institute dashboard → Programs → New program → set Price to 0 → Save → Publish. Students can then enroll with zero payment.",
   },
   {
     q: "How do payouts work?",
