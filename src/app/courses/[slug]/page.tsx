@@ -20,16 +20,18 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { db } from "@/db/client";
-import { tenants, exams } from "@/db/schema";
+import { tenants, exams, enrollments, users } from "@/db/schema";
 import { getCourseBySlug, formatRuntime } from "@/lib/courses";
 import { getRelatedCourses } from "@/lib/marketplace";
 import { getCourseRatingDistribution, listCourseReviews } from "@/lib/reviews";
 import { formatCurrency } from "@/lib/format";
+import { getCurrentUser } from "@/lib/auth";
 import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { EuroCourseCard } from "@/components/euro/course-card";
 import { AddToCartButton } from "@/components/euro/cart-button";
 import { WishlistButton } from "@/components/euro/wishlist-button";
+import { EnrollNowButton } from "./enroll-now-button";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +88,20 @@ export default async function CourseDetailPage({
 
   if (!institute || institute.status === "SUSPENDED") notFound();
 
-  const [related, [examCountRow], rating, reviews] = await Promise.all([
+  // Detect a signed-in viewer + whether they're already enrolled in THIS
+  // program. We resolve users.id by clerkId, then look for any enrollment
+  // row (status is irrelevant — the dashboard query also lists pending
+  // rows, so the CTA shouldn't show "Enroll" if a row already exists).
+  const me = await getCurrentUser();
+  const meRowPromise = me
+    ? db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(eq(users.clerkId, me.userId))
+        .limit(1)
+    : Promise.resolve([] as { id: string; role: string }[]);
+
+  const [related, [examCountRow], rating, reviews, meRows] = await Promise.all([
     getRelatedCourses(tenantId, course.id, 3),
     db
       .select({ n: sql<number>`count(*)::int` })
@@ -94,8 +109,31 @@ export default async function CourseDetailPage({
       .where(and(eq(exams.programId, course.id), eq(exams.isActive, true))),
     getCourseRatingDistribution(course.id),
     listCourseReviews(course.id, { limit: 8 }),
+    meRowPromise,
   ]);
   const examCount = examCountRow?.n ?? 0;
+
+  const meRow = meRows[0];
+  const isSignedIn = !!meRow;
+  const isStudent =
+    !!meRow &&
+    (meRow.role === "student" || meRow.role === "STUDENT");
+  // Already-enrolled lookup is cheap (indexed two-column filter) and gates
+  // the CTA from showing "Enroll now" to a learner who already owns the
+  // course — a major source of duplicate-pending rows pre-fix.
+  const [existingEnr] = meRow
+    ? await db
+        .select({ id: enrollments.id })
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.userId, meRow.id),
+            eq(enrollments.programId, course.id),
+          ),
+        )
+        .limit(1)
+    : [];
+  const alreadyEnrolled = !!existingEnr;
 
   const FEATURE_LABEL: Record<string, { label: string; icon: typeof Award }> = {
     certificate: { label: "Certificate of Completion", icon: Award },
@@ -316,15 +354,32 @@ export default async function CourseDetailPage({
                     {isApplication ? "Application + qualification call" : "One-time payment · instant access"}
                   </div>
 
-                  <Link
-                    href={`/enroll?course=${course.slug}`}
-                    className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
-                    style={{ background: "var(--ed-gradient)" }}
-                  >
-                    {isApplication ? "Apply now" : "Enroll now"}
-                    <ArrowRight className="size-4" />
-                  </Link>
-                  {!isApplication && (
+                  <div className="mt-5">
+                    <EnrollNowButton
+                      isSignedIn={isSignedIn}
+                      isStudent={isStudent}
+                      alreadyEnrolled={alreadyEnrolled}
+                      requiresApplication={isApplication}
+                      slug={course.slug ?? slug}
+                      item={{
+                        programId: course.id,
+                        slug: course.slug,
+                        title: course.name,
+                        priceCents: course.priceCents,
+                        currency: course.currency,
+                        instituteSlug: institute.slug,
+                        instituteName: institute.name,
+                      }}
+                      ctaLabel={
+                        isApplication
+                          ? "Apply now"
+                          : course.priceCents === 0
+                            ? "Enroll free"
+                            : "Enroll now"
+                      }
+                    />
+                  </div>
+                  {!isApplication && !alreadyEnrolled && (
                     <div className="mt-2">
                       <AddToCartButton
                         item={{
@@ -352,13 +407,15 @@ export default async function CourseDetailPage({
                       </div>
                     </div>
                   )}
-                  <Link
-                    href="/sign-in"
-                    className="mt-2 flex h-11 w-full items-center justify-center rounded-xl border text-sm font-semibold transition-colors hover:bg-[var(--ed-bg)]"
-                    style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink-2)" }}
-                  >
-                    I already have an account
-                  </Link>
+                  {!isSignedIn && (
+                    <Link
+                      href={`/sign-in?redirect_url=${encodeURIComponent(`/courses/${course.slug}`)}`}
+                      className="mt-2 flex h-11 w-full items-center justify-center rounded-xl border text-sm font-semibold transition-colors hover:bg-[var(--ed-bg)]"
+                      style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink-2)" }}
+                    >
+                      I already have an account
+                    </Link>
+                  )}
 
                   <ul className="mt-5 space-y-2.5">
                     {includes.map((it) => (
