@@ -190,7 +190,7 @@ export default async function DiagnosticResultsPage({
             <div className="mt-6 flex flex-wrap items-center gap-4">
               <span className="text-3xl font-bold">{course.price}</span>
               <Link
-                href={`/enroll?course=${sub.recommendedCourseSlug}`}
+                href={`/courses/${sub.recommendedCourseSlug}`}
                 className={buttonVariants({
                   className:
                     "group h-11 rounded-xl bg-white px-6 text-sm text-[#0F172A] hover:bg-white/90",
