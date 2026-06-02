@@ -10,7 +10,10 @@ interface LessonItem {
   id: string;
   title: string;
   durationSeconds: number;
-  videoUrl: string | null;
+  /** Resolved + access-gated server-side. null = no video / not entitled.
+   *  For our hosted files `src` is the protected /api/lessons/<id>/stream
+   *  proxy — never the raw Blob URL. */
+  media: { kind: "video" | "iframe"; src: string } | null;
   resources: { label: string; url: string }[];
   completed: boolean;
 }
@@ -65,7 +68,7 @@ export function CoursePlayer({
       {/* Player */}
       <div className="space-y-4">
         <div className="aspect-video overflow-hidden rounded-2xl bg-foreground shadow-card">
-          <VideoArea title={active?.title} url={active?.videoUrl ?? null} />
+          <VideoArea title={active?.title} media={active?.media ?? null} />
         </div>
         {active && (
           <div className="flex items-center justify-between rounded-2xl bg-card p-5 shadow-card">
@@ -163,50 +166,36 @@ export function CoursePlayer({
   );
 }
 
-function toEmbed(url: string): { kind: "iframe" | "video"; src: string } | null {
-  try {
-    const u = new URL(url);
-    const host = u.hostname.replace("www.", "");
-    if (host === "youtube.com" || host === "m.youtube.com") {
-      const id = u.searchParams.get("v");
-      if (id) return { kind: "iframe", src: `https://www.youtube.com/embed/${id}` };
-    }
-    if (host === "youtu.be") {
-      return { kind: "iframe", src: `https://www.youtube.com/embed${u.pathname}` };
-    }
-    if (host === "vimeo.com") {
-      const id = u.pathname.split("/").filter(Boolean)[0];
-      if (id) return { kind: "iframe", src: `https://player.vimeo.com/video/${id}` };
-    }
-    if (/\.(mp4|webm|mov|m4v)$/i.test(u.pathname)) {
-      return { kind: "video", src: url };
-    }
-    return { kind: "iframe", src: url };
-  } catch {
-    return null;
-  }
-}
-
-function VideoArea({ title, url }: { title?: string; url: string | null }) {
-  const embed = url && !url.includes("placeholder.edt") ? toEmbed(url) : null;
-
-  if (!embed) {
+function VideoArea({
+  title,
+  media,
+}: {
+  title?: string;
+  media: { kind: "video" | "iframe"; src: string } | null;
+}) {
+  if (!media) {
     return (
       <div className="flex h-full items-center justify-center text-background">
         <div className="text-center">
           <PlayCircle className="mx-auto size-12 opacity-70" />
           <p className="mt-3 text-sm opacity-80">{title ?? "Select a lesson"}</p>
-          <p className="mt-1 text-[11px] opacity-50">
-            {url ? "Video coming soon" : "No video for this lesson"}
-          </p>
+          <p className="mt-1 text-[11px] opacity-50">No video for this lesson</p>
         </div>
       </div>
     );
   }
 
-  if (embed.kind === "video") {
+  if (media.kind === "video") {
     return (
-      <video src={embed.src} controls className="size-full" preload="metadata">
+      <video
+        src={media.src}
+        controls
+        controlsList="nodownload"
+        disablePictureInPicture
+        onContextMenu={(e) => e.preventDefault()}
+        className="size-full"
+        preload="metadata"
+      >
         Your browser does not support video.
       </video>
     );
@@ -214,7 +203,7 @@ function VideoArea({ title, url }: { title?: string; url: string | null }) {
 
   return (
     <iframe
-      src={embed.src}
+      src={media.src}
       title={title ?? "Lesson video"}
       className="size-full"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

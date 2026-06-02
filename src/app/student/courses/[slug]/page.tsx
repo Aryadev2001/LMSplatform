@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { getCourseBySlug } from "@/lib/courses";
+import { lessonMediaFor } from "@/lib/lesson-media";
 import { CoursePlayer } from "./course-player";
 import { ReviewForm } from "./review-form";
 import { getMyReview, getCourseRating, listCourseReviews } from "@/lib/reviews";
@@ -159,7 +160,10 @@ export default async function StudentCourseDeliveryPage({
       id: l.id,
       title: l.title,
       durationSeconds: l.durationSeconds,
-      videoUrl: l.videoUrl,
+      // Only entitled viewers get a media descriptor, and hosted files resolve
+      // to the protected /api/lessons/<id>/stream proxy — the raw Blob URL is
+      // never serialized into the client payload.
+      media: enrolled ? lessonMediaFor(l.id, l.videoUrl) : null,
       resources: (l.resources as { label: string; url: string }[] | null) ?? [],
       completed: doneSet.has(l.id),
     })),
