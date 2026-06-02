@@ -10,12 +10,10 @@ import {
   Award,
   Star,
   ChevronDown,
-  ArrowRight,
   Building2,
   ClipboardList,
   Globe,
   Hourglass,
-  Sparkles,
   Hammer,
   MessageSquare,
 } from "lucide-react";
@@ -157,26 +155,6 @@ export default async function CourseDetailPage({
   const rupees = Math.floor(course.priceCents / 100);
   const referPts = Math.floor((rupees * institute.referralPct) / 100);
   const isApplication = course.requiresApplication;
-
-  const includes = [
-    { icon: Layers, label: `${modules.length} modules` },
-    { icon: PlayCircle, label: `${totalLessons} lessons` },
-    {
-      icon: Clock,
-      label:
-        course.totalDurationHours > 0
-          ? `${course.totalDurationHours} hours of content`
-          : `${formatRuntime(totalSeconds)} of content`,
-    },
-    examCount > 0
-      ? { icon: ClipboardList, label: `${examCount} graded exam${examCount === 1 ? "" : "s"}` }
-      : null,
-    { icon: Globe, label: `Taught in ${LANGUAGE_LABEL[course.language] ?? "English"}` },
-    course.certificateTemplateUrl
-      ? { icon: Award, label: "Verified certificate on completion" }
-      : null,
-    { icon: CheckCircle2, label: "Lifetime access & updates" },
-  ].filter((x): x is { icon: typeof Layers; label: string } => x !== null);
 
   // Hero copy — keeps the product page from looking empty when a partner
   // hasn't written a tagline/description yet. Derived from real course data.
@@ -330,6 +308,38 @@ export default async function CourseDetailPage({
                   </div>
                 ))}
               </div>
+
+              {/* What you'll learn — syllabus preview. Fills the column beside
+                  the buy box so the hero never shows a dead gap, and gives the
+                  page a real product feel. */}
+              {modules.length > 0 && (
+                <div className="mt-8">
+                  <h2
+                    className="text-lg font-extrabold tracking-tight"
+                    style={{ color: "var(--ed-ink)" }}
+                  >
+                    What you&apos;ll learn
+                  </h2>
+                  <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {modules.slice(0, 8).map((mod, i) => (
+                      <li
+                        key={mod.id}
+                        className="flex items-start gap-2.5 text-sm"
+                        style={{ color: "var(--ed-ink-2)" }}
+                      >
+                        <CheckCircle2
+                          className="mt-0.5 size-4 shrink-0"
+                          style={{ color: "var(--ed-green)" }}
+                        />
+                        <span>
+                          <span className="font-semibold">Module {i + 1}:</span>{" "}
+                          {mod.title}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* Right: sticky buy box */}
@@ -453,14 +463,6 @@ export default async function CourseDetailPage({
                     </Link>
                   )}
 
-                  <ul className="mt-5 space-y-2.5">
-                    {includes.map((it) => (
-                      <li key={it.label} className="flex items-center gap-2 text-xs" style={{ color: "var(--ed-ink-2)" }}>
-                        <it.icon className="size-4 shrink-0" style={{ color: "var(--ed-green)" }} />
-                        {it.label}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               </div>
 
