@@ -7,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { requireRole, isStudentRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
+import { hasFeature } from "@/lib/tier-lock";
 import { recordAudit } from "@/lib/audit";
 import { syncPlanToGateway } from "@/lib/payments/sync-plan";
 
@@ -75,13 +76,21 @@ function makeCourseSlug(name: string): string {
   return `${base || "course"}-${suffix}`;
 }
 
-/** Basic partners can publish paid courses per the registration spec —
- *  this gate is intentionally a no-op so we keep the call sites' shape
- *  in case future tiers reintroduce a pricing-restricted plan. */
+/** Charging for a course requires the `paid_courses` feature (Standard+).
+ *  Basic partners can still publish FREE courses (price 0) and see who
+ *  enrolls. Enforced server-side here so the price field UI hint can't be
+ *  bypassed; super-admins pass (hasFeature returns true for them). */
 async function assertPriceAllowed(
   _tenantId: string,
-  _priceCents: number,
+  priceCents: number,
 ): Promise<ProgramResult | null> {
+  if (priceCents > 0 && !(await hasFeature("paid_courses"))) {
+    return {
+      success: false,
+      error:
+        "Publishing a paid course requires the Standard plan or higher. Upgrade in Billing, or set the price to 0 to publish it free.",
+    };
+  }
   return null;
 }
 

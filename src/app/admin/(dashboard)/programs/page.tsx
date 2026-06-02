@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { programs } from "@/db/schema";
 import { and, eq, desc, ilike } from "drizzle-orm";
 import { requireTenantId } from "@/lib/tenant";
+import { hasFeature } from "@/lib/tier-lock";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { Card } from "@/components/ui/card";
@@ -28,6 +29,7 @@ export default async function AdminProgramsPage({
 }) {
   const { q } = await searchParams;
   const tenantId = await requireTenantId();
+  const canPublishPaid = await hasFeature("paid_courses");
   const search = q?.trim();
   const rows = await db
     .select()
@@ -45,7 +47,7 @@ export default async function AdminProgramsPage({
         eyebrow="— Programs"
         title="Coaching programs"
         description="The packages students can enroll in. Set pricing and duration here."
-        actions={<ProgramDialog mode="create" />}
+        actions={<ProgramDialog mode="create" canPublishPaid={canPublishPaid} />}
       />
 
       <div className="mb-4">
@@ -145,6 +147,7 @@ export default async function AdminProgramsPage({
                       </Link>
                       <ProgramDialog
                         mode="edit"
+                        canPublishPaid={canPublishPaid}
                         initial={{
                           id: p.id,
                           name: p.name,

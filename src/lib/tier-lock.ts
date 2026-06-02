@@ -46,6 +46,18 @@ export function tierAtLeast(have: PartnerTier, min: PartnerTier): boolean {
  * checkbox in the super-admin tenant edit form.
  */
 export const FEATURES = {
+  paid_courses: {
+    label: "Paid courses",
+    minTier: "standard" as PartnerTier,
+    description:
+      "Publish courses priced above ₹0. Basic partners can publish free courses and see who enrolls; charging for a course requires Standard or higher.",
+  },
+  student_details: {
+    label: "Student details & contact",
+    minTier: "standard" as PartnerTier,
+    description:
+      "View enrolled students' email, profile, progress and the full student detail page. Basic partners see names, course and enrollment date only.",
+  },
   ai_services: {
     label: "AI Services",
     minTier: "premium" as PartnerTier,

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { db } from "@/db/client";
 import { users, students, programs, enrollments } from "@/db/schema";
 import { eq, and, or, ilike, inArray, sql } from "drizzle-orm";
+import { Lock } from "lucide-react";
 import { STUDENT_DB_ROLES } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
+import { hasFeature } from "@/lib/tier-lock";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TableToolbar } from "@/components/dashboard/table-toolbar";
 import { Card } from "@/components/ui/card";
@@ -29,6 +31,9 @@ export default async function AdminStudentsPage({
 }) {
   const { q } = await searchParams;
   const tenantId = await requireTenantId();
+  // Standard+ unlocks contact details, the per-student detail page, and
+  // course assignment. Basic sees the roster (name + course + date) only.
+  const canSeeDetails = await hasFeature("student_details");
   const search = q?.trim();
   // Restricted to PAYING students per the partner-dashboard lockdown: only
   // users with at least one paid/account_created/assigned enrollment in
@@ -87,9 +92,29 @@ export default async function AdminStudentsPage({
     <div className="mx-auto max-w-7xl">
       <PageHeader
         eyebrow="— Students"
-        title="Paying students"
-        description="Only students with a paid enrollment in your courses. Free signups and unfulfilled enrollments aren't shown."
+        title="Enrolled students"
+        description={
+          canSeeDetails
+            ? "Students enrolled in your courses, with contact details and per-student insights."
+            : "Students enrolled in your courses. Upgrade to Standard to see contact details, open a student's profile, and assign courses."
+        }
       />
+
+      {!canSeeDetails && (
+        <Link
+          href="/admin/partner/billing"
+          className="mb-4 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm transition-colors hover:bg-primary/10"
+        >
+          <Lock className="size-4 shrink-0 text-primary" />
+          <span className="text-foreground">
+            <span className="font-semibold">You can see who enrolled.</span>{" "}
+            <span className="text-muted-foreground">
+              Upgrade to Standard to view contact details, profiles &amp; progress, and assign courses.
+            </span>
+          </span>
+          <span className="ml-auto shrink-0 font-semibold text-primary">Upgrade →</span>
+        </Link>
+      )}
 
       <div className="mb-4">
         <TableToolbar searchPlaceholder="Search students by name or email…" />
@@ -126,7 +151,13 @@ export default async function AdminStudentsPage({
                         </Avatar>
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{r.fullName ?? "—"}</div>
-                          <div className="truncate text-xs text-muted-foreground">{r.email}</div>
+                          {canSeeDetails ? (
+                            <div className="truncate text-xs text-muted-foreground">{r.email}</div>
+                          ) : (
+                            <div className="truncate text-xs italic text-muted-foreground/70">
+                              Contact hidden
+                            </div>
+                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -145,19 +176,30 @@ export default async function AdminStudentsPage({
                       {formatDate(r.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      {canSeeDetails ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/admin/students/${r.userId}`}
+                            className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          >
+                            View
+                          </Link>
+                          <AssignDialog
+                            student={{ userId: r.userId, name: r.fullName ?? r.email }}
+                            programsList={activePrograms.map((p) => ({ id: p.id, name: p.name }))}
+                            currentProgramId={r.assignedProgramId}
+                          />
+                        </div>
+                      ) : (
                         <Link
-                          href={`/admin/students/${r.userId}`}
-                          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          href="/admin/partner/billing"
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-secondary"
+                          title="Upgrade to Standard to view student details and assign courses"
                         >
-                          View
+                          <Lock className="size-3" />
+                          Upgrade
                         </Link>
-                        <AssignDialog
-                          student={{ userId: r.userId, name: r.fullName ?? r.email }}
-                          programsList={activePrograms.map((p) => ({ id: p.id, name: p.name }))}
-                          currentProgramId={r.assignedProgramId}
-                        />
-                      </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

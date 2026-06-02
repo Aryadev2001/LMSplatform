@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,6 +50,9 @@ type Values = z.input<typeof Schema>;
 
 interface ProgramDialogProps {
   mode?: "create" | "edit";
+  /** Standard+ feature. When false (Basic tier) the price field is locked to
+   *  free and an upgrade hint is shown; the server also enforces this. */
+  canPublishPaid?: boolean;
   initial?: {
     id: string;
     name: string;
@@ -76,7 +80,7 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   mentor_qa: "Mentor Q&A Sessions",
 };
 
-export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) {
+export function ProgramDialog({ mode = "create", canPublishPaid = true, initial }: ProgramDialogProps) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<Values>({
@@ -194,9 +198,26 @@ export function ProgramDialog({ mode = "create", initial }: ProgramDialogProps) 
                   {...register("priceDollars")}
                   type="number"
                   step="1"
-                  className="h-10 rounded-xl border-black/10 pl-7"
+                  disabled={!canPublishPaid}
+                  title={
+                    canPublishPaid
+                      ? undefined
+                      : "Charging for a course requires the Standard plan. Basic publishes free courses."
+                  }
+                  className="h-10 rounded-xl border-black/10 pl-7 disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
+              {!canPublishPaid && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Free on Basic.{" "}
+                  <Link
+                    href="/admin/partner/billing"
+                    className="font-semibold text-primary underline-offset-2 hover:underline"
+                  >
+                    Upgrade to charge for courses →
+                  </Link>
+                </p>
+              )}
             </Field>
             <Field label="Currency">
               <Input {...register("currency")} maxLength={3} className="h-10 rounded-xl border-black/10 uppercase" />

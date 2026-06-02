@@ -19,13 +19,30 @@ import { updateTenant } from "../../actions";
 
 type Status = "ACTIVE" | "SUSPENDED" | "TRIAL" | "CHURNED";
 type Tier = "basic" | "standard" | "premium";
-type FeatureKey = "ai_services" | "diagnostics" | "white_label";
+type FeatureKey =
+  | "paid_courses"
+  | "student_details"
+  | "ai_services"
+  | "diagnostics"
+  | "white_label";
 type OverrideState = "default" | "granted" | "revoked";
 
 const FEATURE_INFO: Record<
   FeatureKey,
   { label: string; description: string; defaultTier: Tier }
 > = {
+  paid_courses: {
+    label: "Paid courses",
+    description:
+      "Publish courses priced above ₹0 (Basic publishes free courses only).",
+    defaultTier: "standard",
+  },
+  student_details: {
+    label: "Student details & contact",
+    description:
+      "View enrolled students' email/profile/progress + the detail page (Basic sees names only).",
+    defaultTier: "standard",
+  },
   ai_services: {
     label: "AI Services",
     description: "Sell AI subscriptions to enrolled students.",

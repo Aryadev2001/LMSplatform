@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { formatCurrency, formatDate, initialsOf } from "@/lib/format";
 import { isStudentRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
+import { requireFeature } from "@/lib/tier-lock";
 import { AssignDialog } from "../assign-dialog";
 import { PaymentDetail } from "../../payments/payment-detail";
 import {
@@ -47,6 +48,9 @@ export default async function StudentDetailPage({
   params: Promise<{ userId: string }>;
 }) {
   const { userId } = await params;
+  // Viewing a student's full profile/contact/progress is a Standard+ feature.
+  // Basic partners are redirected to the upgrade prompt; super-admins pass.
+  await requireFeature("student_details");
   const tenantId = await requireTenantId();
 
   const [me] = await db.select().from(users).where(eq(users.id, userId)).limit(1);

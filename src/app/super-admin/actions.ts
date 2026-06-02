@@ -107,6 +107,8 @@ async function provisionTenantAdmin(
 }
 
 const FeatureOverrideSchema = z.object({
+  paid_courses: z.boolean().nullable().optional(),
+  student_details: z.boolean().nullable().optional(),
   ai_services: z.boolean().nullable().optional(),
   diagnostics: z.boolean().nullable().optional(),
   white_label: z.boolean().nullable().optional(),
