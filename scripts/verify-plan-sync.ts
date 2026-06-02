@@ -23,7 +23,7 @@ async function run() {
     // 1. No gateway connected → graceful error, NOT a throw
     const r1 = await syncPlanToGateway(tA.id, pA.id);
     ok("no gateway → ok:false (graceful, no throw)",
-       r1.ok === false && /Connect a payment gateway/i.test((r1 as any).error));
+       r1.ok === false && /Connect a payment gateway/i.test((r1 as { error?: string }).error ?? ""));
 
     // error persisted on the program for retry visibility
     const [p1] = await db.select({ err: programs.gatewaySyncError })
@@ -34,7 +34,7 @@ async function run() {
     // 2. Cross-tenant: tenant B cannot sync tenant A's plan
     const r2 = await syncPlanToGateway(tB.id, pA.id);
     ok("cross-tenant plan rejected (isolation)",
-       r2.ok === false && /not found in your workspace/i.test((r2 as any).error));
+       r2.ok === false && /not found in your workspace/i.test((r2 as { error?: string }).error ?? ""));
 
     // 3. Garbage provider value is treated as not-connected, no crash
     await db.update(tenants).set({ paymentProvider: "paypal" }).where(eq(tenants.id, tA.id));

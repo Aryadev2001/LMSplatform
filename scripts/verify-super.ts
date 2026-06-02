@@ -13,10 +13,10 @@ async function run() {
 
   console.log("Super-team rows:");
   su.forEach((u) =>
-    console.log(`  ${u.email} | ${u.role} | normalize=${normalizeRole(u.role as any)} | tenant=${u.tenant ? "edt" : "NULL"} | isSuperAdmin=${u.sa}`),
+    console.log(`  ${u.email} | ${u.role} | normalize=${normalizeRole(u.role as Parameters<typeof normalizeRole>[0])} | tenant=${u.tenant ? "edt" : "NULL"} | isSuperAdmin=${u.sa}`),
   );
 
-  const cap = (r: any) =>
+  const cap = (r: Parameters<typeof canWrite>[0]) =>
     `write=${canWrite(r)} team=${canManageTeam(r)} financials=${canSeeFinancials(r)}`;
   console.log("\nCapability matrix (spec §Roles):");
   console.log(`  OWNER   → ${cap("SUPER_OWNER")}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 /**
@@ -19,8 +19,10 @@ export function NavProgress() {
   const searchParams = useSearchParams();
   const [progress, setProgress] = useState<number | null>(null);
   // Mount-time pathname/search snapshot so the *first* render doesn't
-  // light up the bar — we only animate on subsequent navigations.
-  const [last, setLast] = useState<{ p: string; s: string }>({
+  // light up the bar — we only animate on subsequent navigations. A ref
+  // (not state) because updating it must NOT itself trigger a render —
+  // it's just a comparison baseline read inside the settle effect.
+  const last = useRef<{ p: string; s: string }>({
     p: pathname,
     s: searchParams?.toString() ?? "",
   });
@@ -87,12 +89,12 @@ export function NavProgress() {
   // When the route actually settles, finish the bar.
   useEffect(() => {
     const sp = searchParams?.toString() ?? "";
-    if (pathname === last.p && sp === last.s) return;
-    setLast({ p: pathname, s: sp });
+    if (pathname === last.current.p && sp === last.current.s) return;
+    last.current = { p: pathname, s: sp };
     setProgress(100);
     const t = window.setTimeout(() => setProgress(null), 250);
     return () => window.clearTimeout(t);
-  }, [pathname, searchParams, last.p, last.s]);
+  }, [pathname, searchParams]);
 
   if (progress === null) return null;
 
