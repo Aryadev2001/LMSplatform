@@ -16,6 +16,7 @@ import {
 } from "@/lib/referral";
 import { createInvoiceForOrder } from "@/lib/payments/invoice";
 import { sendEmail } from "@/lib/email";
+import { formatCurrency } from "@/lib/format";
 
 /**
  * Grant access for a paid order. THE single fulfilment path — the mock and
@@ -241,6 +242,34 @@ export async function fulfillOrderById(
     await createInvoiceForOrder(order.id);
   } catch {
     /* non-critical to access; reconcile/replay will re-attempt */
+  }
+
+  // Receipt email — sent for EVERY paid order (the welcome email below is
+  // first-purchase only). Prefer the billing email captured at checkout,
+  // falling back to the account email. Best-effort; never blocks access.
+  const receiptTo = order.billingEmail || dbUser.email;
+  if (receiptTo) {
+    try {
+      const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
+      const firstTitle = its[0]?.title ?? "your order";
+      const itemSummary =
+        its.length > 1 ? `${firstTitle} + ${its.length - 1} more` : firstTitle;
+      await sendEmail({
+        to: receiptTo,
+        template: "purchase_receipt",
+        data: {
+          learnerName:
+            order.billingName || dbUser.fullName || receiptTo.split("@")[0],
+          amount: formatCurrency(order.totalCents, order.currency),
+          invoiceNumber: `INV-${order.orderRef}`,
+          invoiceUrl: `${base}/invoice/${order.id}`,
+          orderRef: order.orderRef,
+          itemSummary,
+        },
+      });
+    } catch {
+      /* email is non-critical; never block access on it */
+    }
   }
 
   // Welcome email — only on the learner's FIRST paid enrollment, using the

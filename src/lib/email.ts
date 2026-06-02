@@ -22,7 +22,10 @@ export type EmailTemplate =
   /** Sent the first time a learner pays for any course. Confirms dashboard
    *  access is unlocked. Data: { learnerName, courseName, courseUrl,
    *  dashboardUrl, orderRef }. */
-  | "dashboard_unlocked";
+  | "dashboard_unlocked"
+  /** Sent for EVERY paid order — the itemised receipt + invoice link. Data:
+   *  { learnerName, amount, invoiceNumber, invoiceUrl, orderRef, itemSummary }. */
+  | "purchase_receipt";
 
 export interface SendEmailInput {
   to: string;
@@ -76,6 +79,30 @@ function render(template: EmailTemplate, data: Record<string, unknown>): { subje
             courseUrl ? ` You can also <a href="${courseUrl}" style="color:${BRAND.blue}">view the course page</a>.` : ""
           }${orderRef ? `<br/><br/><span style="color:${BRAND.mute}">Order ref: ${orderRef}</span>` : ""}`,
           cta: { label: "Go to your dashboard", url: dashboardUrl },
+        }),
+      };
+    }
+    case "purchase_receipt": {
+      const name = s(data.learnerName, "there");
+      const amount = s(data.amount);
+      const invoiceNumber = s(data.invoiceNumber);
+      const invoiceUrl = s(data.invoiceUrl);
+      const orderRef = s(data.orderRef);
+      const itemSummary = s(data.itemSummary, "your order");
+      const cell = (l: string, r: string) =>
+        `<tr><td style="padding:7px 0;color:${BRAND.mute};border-bottom:1px solid ${BRAND.line}">${l}</td><td style="padding:7px 0;text-align:right;border-bottom:1px solid ${BRAND.line}">${r}</td></tr>`;
+      const rows = [
+        itemSummary ? cell("Item", itemSummary) : "",
+        orderRef ? cell("Order", orderRef) : "",
+        invoiceNumber ? cell("Invoice", invoiceNumber) : "",
+        amount ? cell("Total paid", `<strong style="color:${BRAND.ink}">${amount}</strong>`) : "",
+      ].join("");
+      return {
+        subject: `Your receipt${amount ? ` — ${amount}` : ""}${orderRef ? ` (${orderRef})` : ""}`,
+        html: layout({
+          heading: `Payment received — thank you, ${name}!`,
+          body: `Here's the receipt for your purchase.<table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:14px">${rows}</table>`,
+          cta: invoiceUrl ? { label: "View / download invoice", url: invoiceUrl } : undefined,
         }),
       };
     }
