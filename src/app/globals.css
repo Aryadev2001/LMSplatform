@@ -335,14 +335,19 @@
 
 /* Google OAuth is disabled until production custom credentials are set up
    (clicking it returned Google "Authorization Error"). Hide the social
-   buttons + the "or" divider at the CSS layer — the two-class selector
-   out-specifies Clerk's own styles and !important beats any inline display,
-   which a className-only appearance override did not. Re-enable by deleting
-   this block once Google custom creds are configured in Clerk. */
-.euro-clerk .cl-socialButtons,
-.euro-clerk .cl-socialButtonsBlockButton,
-.euro-clerk .cl-socialButtonsIconButton,
-.euro-clerk .cl-socialButtonsBlockButton__google,
-.euro-clerk .cl-dividerRow {
+   buttons + the "or" divider on EVERY Clerk surface in the app — not just
+   .euro-clerk (sign-in/up) but also .admin-clerk (/admin/login),
+   /accept-invite and /onboarding. `body .cl-*` + !important out-specifies
+   Clerk's own styles everywhere. Re-enable by deleting this block once
+   Google custom creds are configured in Clerk.
+   NOTE: this hides it in OUR app only — the Clerk Account Portal
+   (accounts.eurodigital.coach) is governed by the dashboard SSO toggle. */
+body .cl-socialButtons,
+body .cl-socialButtonsBlockButton,
+body .cl-socialButtonsIconButton,
+body .cl-socialButtonsBlockButton__google,
+body .cl-socialButtonsIconButton__google,
+body .cl-dividerRow,
+body .cl-socialButtonsRoot {
   display: none !important;
 }
