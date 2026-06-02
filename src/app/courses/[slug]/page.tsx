@@ -178,6 +178,22 @@ export default async function CourseDetailPage({
     { icon: CheckCircle2, label: "Lifetime access & updates" },
   ].filter((x): x is { icon: typeof Layers; label: string } => x !== null);
 
+  // Hero copy — keeps the product page from looking empty when a partner
+  // hasn't written a tagline/description yet. Derived from real course data.
+  const heroBlurb =
+    course.tagline ??
+    `A ${TIER_LABEL[course.tier].toLowerCase()}-level course by ${institute.name}. ` +
+      `Work through ${modules.length} module${modules.length === 1 ? "" : "s"} at your own pace` +
+      `${course.certificateTemplateUrl ? " and earn a verifiable certificate" : ""}.`;
+  const heroHighlights = [
+    { icon: Award, label: "Certificate on completion" },
+    { icon: Clock, label: "Self-paced · learn anytime" },
+    examCount > 0
+      ? { icon: ClipboardList, label: `${examCount} graded exam${examCount === 1 ? "" : "s"}` }
+      : { icon: PlayCircle, label: `${totalLessons} on-demand lessons` },
+    { icon: CheckCircle2, label: "Lifetime access & updates" },
+  ];
+
   const faqs = [
     {
       q: "How do I get access after paying?",
@@ -252,11 +268,9 @@ export default async function CourseDetailPage({
               >
                 {course.name}
               </h1>
-              {course.tagline && (
-                <p className="mt-3 text-balance md:text-lg" style={{ color: "var(--ed-mute)" }}>
-                  {course.tagline}
-                </p>
-              )}
+              <p className="mt-3 text-balance md:text-lg" style={{ color: "var(--ed-mute)" }}>
+                {heroBlurb}
+              </p>
 
               <Link
                 href={`/institute/${institute.slug}`}
@@ -295,6 +309,26 @@ export default async function CourseDetailPage({
                   </span>
                 )}
                 <span className="flex items-center gap-1.5">{course.durationMonths} month{course.durationMonths > 1 ? "s" : ""} access</span>
+              </div>
+
+              {/* Benefit highlights — keeps the hero from looking empty and
+                  reads like a professional product page. */}
+              <div className="mt-7 grid max-w-xl gap-2.5 sm:grid-cols-2">
+                {heroHighlights.map((h) => (
+                  <div
+                    key={h.label}
+                    className="flex items-center gap-2.5 rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium"
+                    style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink-2)" }}
+                  >
+                    <span
+                      className="flex size-7 shrink-0 items-center justify-center rounded-lg"
+                      style={{ background: "rgba(141,198,63,0.12)", color: "var(--ed-green-dark, #4f7f1c)" }}
+                    >
+                      <h.icon className="size-4" />
+                    </span>
+                    {h.label}
+                  </div>
+                ))}
               </div>
             </div>
 

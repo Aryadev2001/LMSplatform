@@ -79,28 +79,10 @@ export function EnrollNowButton({
     );
   }
 
-  // 3. Anonymous → legacy /enroll funnel (one-form name+email → instant
-  // magic-link account → course in dashboard). It's a much smoother shape
-  // than a Clerk sign-up detour for a $0 starter or first-time visitor.
-  // The legacy flow itself guards against signed-in users to avoid the
-  // ghost-account hazard.
-  if (!isSignedIn) {
-    return (
-      <Link
-        href={`/enroll?course=${slug}`}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
-        style={{ background: "var(--ed-gradient)" }}
-      >
-        {ctaLabel ?? "Enroll now"}
-        <ArrowRight className="size-4" />
-      </Link>
-    );
-  }
-
-  // 4. Buy flow — add to cart (idempotent on programId), then push to
-  // /checkout. The checkout page runs the profile + phone-OTP gates and
-  // the price=0 path is handled there too.
-  function enroll() {
+  // Add the course to the cart (idempotent on programId) then navigate. The
+  // cart persists in localStorage across the sign-up redirect, so an
+  // anonymous visitor keeps their course through auth.
+  function addToCartThen(dest: string) {
     startTransition(() => {
       const inCart = items.some((i) => i.programId === item.programId);
       if (!inCart) {
@@ -110,8 +92,40 @@ export function EnrollNowButton({
           return;
         }
       }
-      router.push("/checkout");
+      router.push(dest);
     });
+  }
+
+  // 3. Anonymous → sign up first, then land straight on /checkout. Checkout
+  // enforces the single gated path for everyone: student profile form →
+  // payment → dashboard access (free $0 courses run the same path).
+  if (!isSignedIn) {
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          addToCartThen(`/sign-up?redirect_url=${encodeURIComponent("/checkout")}`)
+        }
+        disabled={pending}
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        style={{ background: "var(--ed-gradient)" }}
+      >
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <>
+            {ctaLabel ?? "Enroll now"}
+            <ArrowRight className="size-4" />
+          </>
+        )}
+      </button>
+    );
+  }
+
+  // 4. Signed-in buy flow — add to cart, then /checkout (profile + phone-OTP
+  // gates + the price=0 path are handled there).
+  function enroll() {
+    addToCartThen("/checkout");
   }
 
   return (

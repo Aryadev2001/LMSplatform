@@ -20,7 +20,18 @@ function dashboardFor(role: "admin" | "student" | "super" | null): {
   return { href: "/post-login", label: "Continue" };
 }
 
-export default async function SignInPage() {
+/** Only allow internal, relative redirect targets (no open-redirect). */
+function safeRelative(v: string | undefined): string | null {
+  return typeof v === "string" && v.startsWith("/") && !v.startsWith("//") ? v : null;
+}
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect_url?: string }>;
+}) {
+  const { redirect_url } = await searchParams;
+  const target = safeRelative(redirect_url) ?? "/post-login";
   const user = await getCurrentUser();
 
   // Already-signed-in visitors would otherwise be silently bounced by Clerk's
@@ -32,7 +43,7 @@ export default async function SignInPage() {
         <AlreadySignedIn
           email={user.email ?? null}
           dashboardLabel={label}
-          dashboardHref={href}
+          dashboardHref={target !== "/post-login" ? target : href}
           context="sign-in"
         />
       </AnimatedAuth>
@@ -58,9 +69,13 @@ export default async function SignInPage() {
           appearance={clerkAppearance}
           routing="path"
           path="/sign-in"
-          signUpUrl="/sign-up"
-          forceRedirectUrl="/post-login"
-          fallbackRedirectUrl="/post-login"
+          signUpUrl={
+            target !== "/post-login"
+              ? `/sign-up?redirect_url=${encodeURIComponent(target)}`
+              : "/sign-up"
+          }
+          forceRedirectUrl={target}
+          fallbackRedirectUrl={target}
         />
       </div>
     </AnimatedAuth>

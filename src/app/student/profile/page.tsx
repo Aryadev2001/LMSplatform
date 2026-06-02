@@ -37,10 +37,24 @@ function pickObject<T extends object>(raw: unknown, fallback: T): T {
   return fallback;
 }
 
-export default async function StudentProfilePage() {
+export default async function StudentProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string }>;
+}) {
   await requireRole("student");
   const me = await getCurrentUser();
   if (!me) return null;
+
+  const { returnTo: returnToRaw } = await searchParams;
+  // Only honour an internal, relative return target (the checkout gate sends
+  // ?returnTo=/checkout so the form loops back to payment).
+  const returnTo =
+    typeof returnToRaw === "string" &&
+    returnToRaw.startsWith("/") &&
+    !returnToRaw.startsWith("//")
+      ? returnToRaw
+      : null;
 
   const [u] = await db
     .select({
@@ -81,7 +95,7 @@ export default async function StudentProfilePage() {
         title="Your profile"
         description="Personal, professional and billing info we use to enroll you in courses, issue certificates and send updates. Fill it in once — required for paid enrollments."
       />
-      <StudentProfileForm initial={initial} />
+      <StudentProfileForm initial={initial} returnTo={returnTo} />
     </div>
   );
 }

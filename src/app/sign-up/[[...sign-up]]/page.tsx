@@ -19,12 +19,17 @@ function dashboardFor(role: "admin" | "student" | "super" | null): {
   return { href: "/post-login", label: "Continue" };
 }
 
+function safeRelative(v: string | undefined): string | null {
+  return typeof v === "string" && v.startsWith("/") && !v.startsWith("//") ? v : null;
+}
+
 export default async function SignUpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{ ref?: string; redirect_url?: string }>;
 }) {
-  const { ref } = await searchParams;
+  const { ref, redirect_url } = await searchParams;
+  const target = safeRelative(redirect_url);
   const user = await getCurrentUser();
 
   // Already-signed-in visitors would otherwise be silently bounced by Clerk's
@@ -37,7 +42,7 @@ export default async function SignUpPage({
         <AlreadySignedIn
           email={user.email ?? null}
           dashboardLabel={label}
-          dashboardHref={href}
+          dashboardHref={target ?? href}
           context="sign-up"
         />
       </AnimatedAuth>
@@ -46,7 +51,7 @@ export default async function SignUpPage({
 
   return (
     <AnimatedAuth tab="signup">
-      <SignUpPanel refCode={ref ?? null} />
+      <SignUpPanel refCode={ref ?? null} redirectTo={target} />
     </AnimatedAuth>
   );
 }

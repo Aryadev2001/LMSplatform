@@ -71,7 +71,15 @@ const INCOME_RANGES = [
   "$250k+ / yr",
 ];
 
-export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
+export function StudentProfileForm({
+  initial,
+  returnTo,
+}: {
+  initial: InitialProfile;
+  /** When set (e.g. /checkout from the enroll gate), the form returns here
+   *  after a successful save instead of just refreshing in place. */
+  returnTo?: string | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [s, setS] = useState<InitialProfile>(initial);
@@ -146,7 +154,13 @@ export function StudentProfileForm({ initial }: { initial: InitialProfile }) {
       }
       setErrorMsg(null);
       toast.success("Profile saved");
-      router.refresh();
+      // Loop back to where the gate sent us (checkout) so the student goes
+      // straight on to payment; otherwise just refresh in place.
+      if (returnTo) {
+        router.push(returnTo);
+      } else {
+        router.refresh();
+      }
     });
   }
 

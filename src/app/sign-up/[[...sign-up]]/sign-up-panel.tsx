@@ -26,8 +26,20 @@ const ROLES = [
   },
 ] as const;
 
-export function SignUpPanel({ refCode }: { refCode: string | null }) {
+export function SignUpPanel({
+  refCode,
+  redirectTo,
+}: {
+  refCode: string | null;
+  /** Where to land after sign-up (e.g. /checkout for an enroll flow). Falls
+   *  back to /post-login (role-based routing) when not set. */
+  redirectTo?: string | null;
+}) {
   const [role, setRole] = useState<"learner" | "basic_partner">("learner");
+  const afterAuth = redirectTo || "/post-login";
+  const signInHref = redirectTo
+    ? `/sign-in?redirect_url=${encodeURIComponent(redirectTo)}`
+    : "/sign-in";
 
   return (
     <div>
@@ -146,9 +158,9 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
                 appearance={clerkAppearance}
                 routing="path"
                 path="/sign-up"
-                signInUrl="/sign-in"
-                forceRedirectUrl="/post-login"
-                fallbackRedirectUrl="/post-login"
+                signInUrl={signInHref}
+                forceRedirectUrl={afterAuth}
+                fallbackRedirectUrl={afterAuth}
                 unsafeMetadata={{ role: "student" }}
               />
             </div>
@@ -179,9 +191,9 @@ export function SignUpPanel({ refCode }: { refCode: string | null }) {
                 appearance={clerkAppearance}
                 routing="path"
                 path="/sign-up"
-                signInUrl="/sign-in"
-                forceRedirectUrl="/post-login"
-                fallbackRedirectUrl="/post-login"
+                signInUrl={signInHref}
+                forceRedirectUrl={afterAuth}
+                fallbackRedirectUrl={afterAuth}
                 unsafeMetadata={{ role: "basic_partner" }}
               />
             </div>
