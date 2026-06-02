@@ -35,8 +35,10 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     links: [
       { label: "Terms of Service", href: "/legal/terms" },
       { label: "Privacy Policy", href: "/legal/privacy" },
-      { label: "Refund Policy", href: "/legal/refund" },
+      { label: "Cancellation & Refund", href: "/legal/refund" },
+      { label: "Shipping & Delivery", href: "/legal/shipping" },
       { label: "Cookie Policy", href: "/legal/cookies" },
+      { label: "Disclaimer", href: "/legal/disclaimer" },
     ],
   },
 ];
