@@ -18,6 +18,7 @@ import { requireRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { getCourseBySlug } from "@/lib/courses";
 import { lessonMediaFor } from "@/lib/lesson-media";
+import { isModuleLocked, moduleUnlockAt } from "@/lib/drip";
 import { CoursePlayer } from "./course-player";
 import { ReviewForm } from "./review-form";
 import { getMyReview, getCourseRating, listCourseReviews } from "@/lib/reviews";
@@ -59,11 +60,13 @@ export default async function StudentCourseDeliveryPage({
   const enrolled = stu?.assignedProgramId === course.id;
 
   const [enr] = await db
-    .select({ id: enrollments.id })
+    .select({ id: enrollments.id, createdAt: enrollments.createdAt })
     .from(enrollments)
     .where(and(eq(enrollments.userId, me.id), eq(enrollments.programId, course.id)))
     .orderBy(desc(enrollments.createdAt))
     .limit(1);
+  // Earliest enrollment date drives "unlock N days after enrollment" drip.
+  const enrolledAt = enr?.createdAt ?? null;
 
   const allLessonIds = modules.flatMap((m) => m.lessons.map((l) => l.id));
   const done = allLessonIds.length
@@ -153,21 +156,31 @@ export default async function StudentCourseDeliveryPage({
     listCourseReviews(course.id, { limit: 6 }),
   ]);
 
-  const modulesForPlayer = modules.map((mod) => ({
-    id: mod.id,
-    title: mod.title,
-    lessons: mod.lessons.map((l) => ({
-      id: l.id,
-      title: l.title,
-      durationSeconds: l.durationSeconds,
-      // Only entitled viewers get a media descriptor, and hosted files resolve
-      // to the protected /api/lessons/<id>/stream proxy — the raw Blob URL is
-      // never serialized into the client payload.
-      media: enrolled ? lessonMediaFor(l.id, l.videoUrl) : null,
-      resources: (l.resources as { label: string; url: string }[] | null) ?? [],
-      completed: doneSet.has(l.id),
-    })),
-  }));
+  const dripNow = new Date();
+  const modulesForPlayer = modules.map((mod) => {
+    const drip = {
+      releaseAt: mod.releaseAt ?? null,
+      unlockAfterDays: mod.unlockAfterDays ?? null,
+    };
+    const locked = enrolled ? isModuleLocked(drip, enrolledAt, dripNow) : false;
+    const unlockAt = locked ? moduleUnlockAt(drip, enrolledAt) : null;
+    return {
+      id: mod.id,
+      title: mod.title,
+      // Drip: a not-yet-released module is locked with the unlock date; its
+      // lessons get no media (so the protected stream can't be reached).
+      locked,
+      unlockAt: unlockAt ? unlockAt.toISOString() : null,
+      lessons: mod.lessons.map((l) => ({
+        id: l.id,
+        title: l.title,
+        durationSeconds: l.durationSeconds,
+        media: enrolled && !locked ? lessonMediaFor(l.id, l.videoUrl) : null,
+        resources: (l.resources as { label: string; url: string }[] | null) ?? [],
+        completed: doneSet.has(l.id),
+      })),
+    };
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

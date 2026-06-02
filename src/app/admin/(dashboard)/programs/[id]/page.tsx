@@ -151,7 +151,15 @@ export default async function CourseContentPage({
                     <ModuleDialog
                       courseId={course.id}
                       mode="edit"
-                      initial={{ id: mod.id, title: mod.title, description: mod.description }}
+                      initial={{
+                        id: mod.id,
+                        title: mod.title,
+                        description: mod.description,
+                        releaseAt: mod.releaseAt
+                          ? new Date(mod.releaseAt).toISOString().slice(0, 16)
+                          : null,
+                        unlockAfterDays: mod.unlockAfterDays ?? null,
+                      }}
                     />
                     <DeleteModuleButton moduleId={mod.id} courseId={course.id} />
                   </div>

@@ -20,6 +20,9 @@ interface LessonItem {
 interface ModuleItem {
   id: string;
   title: string;
+  /** Drip lock — true until the module's release date / unlock-after-days. */
+  locked?: boolean;
+  unlockAt?: string | null;
   lessons: LessonItem[];
 }
 
@@ -32,7 +35,8 @@ export function CoursePlayer({
   modules: ModuleItem[];
   locked: boolean;
 }) {
-  const flat = modules.flatMap((m) => m.lessons);
+  // Lessons in UNLOCKED modules only — drives default selection + "next".
+  const flat = modules.flatMap((m) => (m.locked ? [] : m.lessons));
   const firstIncomplete = flat.find((l) => !l.completed) ?? flat[0];
   const [activeId, setActiveId] = useState(firstIncomplete?.id);
   const [pending, startTransition] = useTransition();
@@ -131,8 +135,18 @@ export function CoursePlayer({
         {modules.map((mod, i) => (
           <div key={mod.id} className="overflow-hidden rounded-2xl bg-card shadow-card">
             <div className="border-b border-black/5 px-4 py-3">
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Module {i + 1}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Module {i + 1}
+                </div>
+                {mod.locked && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+                    <Lock className="size-3" />
+                    {mod.unlockAt
+                      ? `Unlocks ${new Date(mod.unlockAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                      : "Locked"}
+                  </span>
+                )}
               </div>
               <div className="text-sm font-semibold">{mod.title}</div>
             </div>
@@ -141,12 +155,17 @@ export function CoursePlayer({
                 <li key={l.id}>
                   <button
                     type="button"
-                    onClick={() => setActiveId(l.id)}
-                    className={`flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm transition-colors hover:bg-secondary/60 ${
-                      activeId === l.id ? "bg-secondary/60" : ""
-                    }`}
+                    disabled={mod.locked}
+                    onClick={() => !mod.locked && setActiveId(l.id)}
+                    className={`flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm transition-colors ${
+                      mod.locked
+                        ? "cursor-not-allowed opacity-55"
+                        : "hover:bg-secondary/60"
+                    } ${activeId === l.id ? "bg-secondary/60" : ""}`}
                   >
-                    {l.completed ? (
+                    {mod.locked ? (
+                      <Lock className="size-4 shrink-0 text-muted-foreground" />
+                    ) : l.completed ? (
                       <CheckCircle2 className="size-4 shrink-0 text-[#8CC63F]" />
                     ) : (
                       <Circle className="size-4 shrink-0 text-muted-foreground" />

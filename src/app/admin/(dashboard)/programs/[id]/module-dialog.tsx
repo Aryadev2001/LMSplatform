@@ -25,24 +25,40 @@ export function ModuleDialog({
 }: {
   courseId: string;
   mode?: "create" | "edit";
-  initial?: { id: string; title: string; description: string | null };
+  initial?: {
+    id: string;
+    title: string;
+    description: string | null;
+    releaseAt?: string | null;
+    unlockAfterDays?: number | null;
+  };
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  // Drip controls. releaseAt is a datetime-local string; unlockAfterDays a
+  // count of days after enrollment. Either/both empty = available immediately.
+  const [releaseAt, setReleaseAt] = useState(initial?.releaseAt ?? "");
+  const [unlockAfterDays, setUnlockAfterDays] = useState(
+    initial?.unlockAfterDays != null ? String(initial.unlockAfterDays) : "",
+  );
 
   function submit() {
     startTransition(async () => {
+      const days = unlockAfterDays.trim() === "" ? null : Number(unlockAfterDays);
+      const rel = releaseAt.trim() === "" ? null : releaseAt;
       const r =
         mode === "edit" && initial
-          ? await updateModule(initial.id, courseId, title, description)
-          : await createModule({ courseId, title, description });
+          ? await updateModule(initial.id, courseId, title, description, rel, days)
+          : await createModule({ courseId, title, description, releaseAt: rel, unlockAfterDays: days });
       if (r.success) {
         toast.success(mode === "edit" ? "Module updated" : "Module added");
         if (mode === "create") {
           setTitle("");
           setDescription("");
+          setReleaseAt("");
+          setUnlockAfterDays("");
         }
         setOpen(false);
       } else {
@@ -89,6 +105,36 @@ export function ModuleDialog({
               rows={4}
               className="max-h-[40vh] overflow-y-auto rounded-xl border-black/10"
             />
+          </div>
+
+          {/* Drip / scheduled release */}
+          <div className="rounded-xl border border-black/10 p-3">
+            <div className="text-xs font-semibold">Drip release <span className="font-normal text-muted-foreground">(optional)</span></div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Keep this module locked until a date, or until N days after the student enrolls. Leave both empty for instant access.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-medium">Release on</Label>
+                <Input
+                  type="datetime-local"
+                  value={releaseAt}
+                  onChange={(e) => setReleaseAt(e.target.value)}
+                  className="h-9 rounded-lg border-black/10 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-medium">Unlock after (days)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={unlockAfterDays}
+                  onChange={(e) => setUnlockAfterDays(e.target.value)}
+                  placeholder="e.g. 7"
+                  className="h-9 rounded-lg border-black/10 text-xs"
+                />
+              </div>
+            </div>
           </div>
         </div>
         <DialogFooter className="gap-2">

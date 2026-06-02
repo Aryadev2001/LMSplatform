@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Poppins, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { TenantBrandStyle } from "@/components/tenant-brand-style";
 import { NavProgress } from "@/components/nav-progress";
+import { PWARegister } from "@/components/pwa-register";
 import { Suspense } from "react";
 
 const inter = Inter({
@@ -29,6 +30,13 @@ export const metadata: Metadata = {
   title: "Euro Digital Technologies — Business Diagnosis & Clarity Program",
   description:
     "Take the free Business X-Ray: a 7-layer scan that scores your business 0–100 and shows you exactly what to fix first. By Euro Digital Technologies (eurodigital.coach).",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "EuroDigital", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1AADE0",
 };
 
 export default function RootLayout({
@@ -75,6 +83,7 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <NavProgress />
           </Suspense>
+          <PWARegister />
           <TenantBrandStyle />
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
             <TooltipProvider delay={150}>

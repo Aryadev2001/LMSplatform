@@ -7,6 +7,8 @@ import {
   Settings,
   BookOpen,
   Activity,
+  BarChart3,
+  CalendarClock,
   Building2,
   Users2,
   ScrollText,
@@ -35,9 +37,11 @@ export type NavItem = {
 export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
   admin: [
     { label: "Overview", href: "/admin", icon: LayoutDashboard },
+    { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { label: "Partner Setup", href: "/admin/partner", icon: UserSquare2 },
     { label: "Students", href: "/admin/students", icon: GraduationCap },
     { label: "Courses", href: "/admin/programs", icon: BookOpen },
+    { label: "Live Classes", href: "/admin/live", icon: CalendarClock },
     { label: "Enrollments", href: "/admin/enrollments", icon: ClipboardList },
     { label: "Payments", href: "/admin/payments", icon: CreditCard },
     {
@@ -60,6 +64,7 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
     { label: "Overview", href: "/student", icon: LayoutDashboard },
     { label: "My Profile", href: "/student/profile", icon: UserSquare2 },
     { label: "My Courses", href: "/student/courses", icon: BookOpen },
+    { label: "Live Classes", href: "/student/live", icon: CalendarClock },
     { label: "My Diagnostic", href: "/student/diagnostic", icon: Activity },
     { label: "AI Services", href: "/student/ai-services", icon: Sparkles },
     { label: "AI Subscriptions", href: "/student/ai-subscriptions", icon: CreditCard },

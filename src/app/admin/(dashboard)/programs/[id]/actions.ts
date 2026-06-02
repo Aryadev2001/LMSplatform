@@ -54,7 +54,17 @@ const ModuleSchema = z.object({
   courseId: z.uuid(),
   title: z.string().min(2, "Title is required").max(240),
   description: z.string().max(2000).optional().or(z.literal("")),
+  // Drip: absolute release date and/or "unlock N days after enrollment".
+  releaseAt: z.string().optional().nullable(),
+  unlockAfterDays: z.coerce.number().int().min(0).max(3650).nullable().optional(),
 });
+
+/** Parse a datetime-local / ISO string to a Date, or null when empty/invalid. */
+function parseReleaseAt(v: string | null | undefined): Date | null {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export async function createModule(input: z.infer<typeof ModuleSchema>) {
   await gate();
@@ -69,6 +79,8 @@ export async function createModule(input: z.infer<typeof ModuleSchema>) {
     courseId: p.data.courseId,
     title: p.data.title,
     description: p.data.description || null,
+    releaseAt: parseReleaseAt(p.data.releaseAt),
+    unlockAfterDays: p.data.unlockAfterDays ?? null,
     orderIndex: (max ?? -1) + 1,
   });
   revalidatePath(`/admin/programs/${p.data.courseId}`);
@@ -80,6 +92,8 @@ export async function updateModule(
   courseId: string,
   title: string,
   description: string,
+  releaseAt?: string | null,
+  unlockAfterDays?: number | null,
 ) {
   await gate();
   if (title.trim().length < 2) return { success: false as const, error: "Title too short" };
@@ -87,7 +101,15 @@ export async function updateModule(
     return DENIED;
   await db
     .update(modules)
-    .set({ title: title.trim(), description: description || null })
+    .set({
+      title: title.trim(),
+      description: description || null,
+      releaseAt: parseReleaseAt(releaseAt),
+      unlockAfterDays:
+        unlockAfterDays === undefined || unlockAfterDays === null || Number.isNaN(unlockAfterDays)
+          ? null
+          : unlockAfterDays,
+    })
     .where(eq(modules.id, moduleId));
   revalidatePath(`/admin/programs/${courseId}`);
   return { success: true as const };

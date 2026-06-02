@@ -387,6 +387,11 @@ export const modules = pgTable(
     // ---- 0013 ----
     durationMinutes: integer("duration_minutes").notNull().default(0),
     introVideoUrl: text("intro_video_url"),
+    // ---- Drip / scheduled release ----
+    // Absolute release date (cohort-style) and/or "unlock N days after the
+    // student enrolled" (self-paced drip). Either/both null = available now.
+    releaseAt: timestamp("release_at", { withTimezone: true }),
+    unlockAfterDays: integer("unlock_after_days"),
   },
   (t) => [index("modules_course_idx").on(t.courseId)],
 );
@@ -1350,5 +1355,32 @@ export const invoices = pgTable(
     uniqueIndex("invoices_number_idx").on(t.invoiceNumber),
     index("invoices_tenant_idx").on(t.tenantId),
     index("invoices_user_idx").on(t.userId),
+  ],
+);
+
+// ---------- Live classes (partner-scheduled, manual join link) ----------
+export const liveSessions = pgTable(
+  "live_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    // Optional — scope a session to one course; null = open to all the
+    // institute's enrolled students.
+    programId: uuid("program_id").references(() => programs.id, {
+      onDelete: "set null",
+    }),
+    title: varchar("title", { length: 240 }).notNull(),
+    description: text("description"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    durationMinutes: integer("duration_minutes").notNull().default(60),
+    joinUrl: text("join_url").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("live_sessions_tenant_idx").on(t.tenantId),
+    index("live_sessions_program_idx").on(t.programId),
+    index("live_sessions_starts_idx").on(t.startsAt),
   ],
 );
