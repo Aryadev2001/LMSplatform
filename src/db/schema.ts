@@ -1384,3 +1384,44 @@ export const liveSessions = pgTable(
     index("live_sessions_starts_idx").on(t.startsAt),
   ],
 );
+
+// ---------- Course bundles (sell several courses together at a discount) ----------
+export const bundles = pgTable(
+  "bundles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    slug: varchar("slug", { length: 140 }),
+    name: varchar("name", { length: 240 }).notNull(),
+    description: text("description"),
+    priceCents: integer("price_cents").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    imageUrl: text("image_url"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("bundles_slug_idx").on(t.slug),
+    index("bundles_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const bundleItems = pgTable(
+  "bundle_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    bundleId: uuid("bundle_id")
+      .notNull()
+      .references(() => bundles.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    uniqueIndex("bundle_items_unique").on(t.bundleId, t.programId),
+    index("bundle_items_bundle_idx").on(t.bundleId),
+  ],
+);
