@@ -184,6 +184,7 @@ export async function removeAdmin(targetUserId: string) {
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 const BrandingSchema = z.object({
+  name: z.string().trim().min(2, "Institute name must be at least 2 characters").max(200),
   logoUrl: z.string().url().max(2048).optional().or(z.literal("")),
   brandPrimaryColor: z.string().regex(HEX, "Use a #rrggbb hex color"),
   brandSecondaryColor: z.string().regex(HEX, "Use a #rrggbb hex color"),
@@ -217,6 +218,7 @@ export async function updateMyTenantBranding(
   await db
     .update(tenants)
     .set({
+      name: d.name,
       logoUrl: d.logoUrl ? d.logoUrl : null,
       brandPrimaryColor: d.brandPrimaryColor,
       brandSecondaryColor: d.brandSecondaryColor,

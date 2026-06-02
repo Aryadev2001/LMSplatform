@@ -332,6 +332,11 @@ export const programs = pgTable(
     status: courseStatusEnum("status").notNull().default("draft"),
     requiresApplication: boolean("requires_application").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
+    // ---- Super-admin approval gate ----
+    // A partner-published course is only PUBLICLY visible once a super-admin
+    // approves it. NULL = pending review. Set when approved; cleared on reject.
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedBy: uuid("approved_by"),
     stripePriceId: varchar("stripe_price_id", { length: 128 }),
     // Mirror of this plan inside the tenant's own gateway (created via their
     // connected Stripe/Razorpay). gatewaySyncError holds the last failure.

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { upload } from "@vercel/blob/client";
 import {
   UploadCloud,
   Loader2,
@@ -25,52 +26,35 @@ export function FileUpload({ accept, label, value, onUploaded, onClear }: FileUp
   const [pct, setPct] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
-  function handleFile(file: File) {
+  async function handleFile(file: File) {
     setBusy(true);
     setPct(0);
     setErr(null);
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/blob/upload");
-    xhr.setRequestHeader("content-type", file.type || "application/octet-stream");
-    xhr.setRequestHeader("x-filename", file.name);
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100));
-    };
-
-    xhr.onload = () => {
-      setBusy(false);
-      let parsedError: string | null = null;
-      try {
-        const res = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300 && res.url) {
-          onUploaded(res.url);
-          toast.success(`${label} uploaded`);
-          return;
-        }
-        parsedError = res.error ?? `Upload failed (HTTP ${xhr.status})`;
-      } catch {
-        // Non-JSON body. Show a slice of raw response so the user can tell
-        // whether it's an auth redirect, a 502 from the platform, etc.
-        const snippet = (xhr.responseText || "").slice(0, 200).trim();
-        parsedError = `Upload failed (HTTP ${xhr.status})${
-          snippet ? ` — ${snippet}` : ""
-        }`;
-      }
-      setErr(parsedError);
-      toast.error(parsedError);
-    };
-
-    xhr.onerror = () => {
-      setBusy(false);
+    try {
+      // Direct browser → Vercel Blob upload. The file NEVER passes through
+      // our serverless function (which caps request bodies at 4.5 MB), so
+      // large videos no longer 413. `multipart` chunks big files for
+      // reliability; our /api/blob/upload route only mints the token.
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/blob/upload",
+        contentType: file.type || undefined,
+        multipart: true,
+        onUploadProgress: (e) => setPct(Math.round(e.percentage)),
+      });
+      onUploaded(blob.url);
+      toast.success(`${label} uploaded`);
+    } catch (e) {
       const msg =
-        "Upload failed — network error. Check your connection or try a smaller file.";
+        e instanceof Error
+          ? e.message
+          : "Upload failed — check your connection and try again.";
       setErr(msg);
       toast.error(msg);
-    };
-
-    xhr.send(file);
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (value) {

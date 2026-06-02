@@ -86,8 +86,8 @@ export function ModuleDialog({
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="rounded-xl border-black/10"
+              rows={4}
+              className="max-h-[40vh] overflow-y-auto rounded-xl border-black/10"
             />
           </div>
         </div>

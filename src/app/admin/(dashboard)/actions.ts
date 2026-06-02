@@ -57,6 +57,24 @@ const ProgramSchema = z.object({
 
 export type ProgramResult = { success: true; id: string } | { success: false; error: string };
 
+/**
+ * Build a URL-safe, unique-ish course slug from its name. A short random
+ * suffix guarantees uniqueness against the programs_slug_idx unique index
+ * without a read-modify-write loop. A course with NO slug is unreachable on
+ * the marketplace (the storefront card falls back to /sign-in), so every
+ * course MUST get one at creation time.
+ */
+function makeCourseSlug(name: string): string {
+  const base = name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90);
+  const suffix = Math.random().toString(36).slice(2, 7);
+  return `${base || "course"}-${suffix}`;
+}
+
 /** Basic partners can publish paid courses per the registration spec —
  *  this gate is intentionally a no-op so we keep the call sites' shape
  *  in case future tiers reintroduce a pricing-restricted plan. */
@@ -95,8 +113,10 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
       termsHtml: parsed.data.termsHtml || null,
       certificateTemplateUrl: parsed.data.certificateTemplateUrl || null,
       tenantId,
-      // Auto-publish: course goes live on the storefront immediately. Partner
-      // can still toggle isActive=false to take it down without unpublishing.
+      slug: makeCourseSlug(parsed.data.name),
+      // Submitted for listing, but NOT publicly visible until a super-admin
+      // approves it (approvedAt stays NULL → storefront/marketplace hide it).
+      // Partner can still toggle isActive=false to withdraw it.
       status: "published",
     })
     .returning({ id: programs.id });

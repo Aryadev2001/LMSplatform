@@ -528,6 +528,60 @@ export async function impersonateTenant(input: unknown): Promise<Result> {
   redirect("/admin");
 }
 
+/**
+ * Approve (or revoke approval of) a partner-submitted course. Only an
+ * approved course is publicly visible on the marketplace / storefront /
+ * course page (the approvedAt gate). Write-capable super roles only.
+ * Audited; flushes the public read caches so the change shows immediately.
+ */
+export async function setCourseApproval(
+  programId: string,
+  approve: boolean,
+): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Your role can't approve courses." };
+  }
+
+  const [course] = await db
+    .select({ id: programs.id, name: programs.name, tenantId: programs.tenantId })
+    .from(programs)
+    .where(eq(programs.id, programId))
+    .limit(1);
+  if (!course) return { success: false, error: "Course not found." };
+
+  // Resolve the super-admin's DB user id for the approvedBy audit trail.
+  const [meRow] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, me.userId))
+    .limit(1);
+
+  await db
+    .update(programs)
+    .set({
+      approvedAt: approve ? new Date() : null,
+      approvedBy: approve ? (meRow?.id ?? null) : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(programs.id, programId));
+
+  await recordAudit({
+    action: approve ? "course.approve" : "course.unapprove",
+    targetType: "program",
+    targetId: programId,
+    metadata: { name: course.name, tenantId: course.tenantId },
+  });
+
+  // Public reads are cached — flush so the storefront/marketplace reflect
+  // the approval (or removal) right away.
+  revalidatePath("/super-admin/courses");
+  revalidateTag("course", "default");
+  revalidateTag("marketplace", "default");
+  revalidateTag("tenant", "default");
+  return { success: true };
+}
+
 /** Exit impersonation and return to the super-admin console. Audited. */
 export async function stopImpersonation(): Promise<Result> {
   const me = await requireSuper();

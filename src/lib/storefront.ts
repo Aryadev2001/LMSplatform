@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   tenants,
@@ -35,6 +35,18 @@ export interface StorefrontCourse {
   reviewCount: number;
 }
 
+/** Owner / company social links, as captured in the partner onboarding
+ *  wizard (stored on tenants.ownerSocials / companySocials as jsonb). All
+ *  keys optional — only non-empty values are rendered on the storefront. */
+export interface SocialLinks {
+  website?: string;
+  linkedin?: string;
+  twitter?: string;
+  instagram?: string;
+  facebook?: string;
+  youtube?: string;
+}
+
 export interface Storefront {
   tenant: {
     id: string;
@@ -53,6 +65,7 @@ export interface Storefront {
     ownerTitle: string | null;
     ownerProfile: string | null;
     ownerPhotoUrl: string | null;
+    ownerSocials: SocialLinks | null;
     activeOffers: number;
     /** True when the storefront should hide eurodigital.coach branding —
      *  tenant has the white_label feature granted (via tier or override)
@@ -93,6 +106,7 @@ async function _readStorefront(slug: string): Promise<Storefront | null> {
       ownerTitle: tenants.ownerTitle,
       ownerProfile: tenants.ownerProfile,
       ownerPhotoUrl: tenants.ownerPhotoUrl,
+      ownerSocials: tenants.ownerSocials,
       hidePlatformLogo: tenants.hidePlatformLogo,
       featureOverrides: tenants.featureOverrides,
       introVideoUrl: tenants.introVideoUrl,
@@ -148,6 +162,7 @@ async function _readStorefront(slug: string): Promise<Storefront | null> {
           eq(programs.tenantId, tenant.id),
           eq(programs.status, "published"),
           eq(programs.isActive, true),
+          isNotNull(programs.approvedAt), // super-admin approval gate
         ),
       )
       .orderBy(desc(programs.createdAt)),
@@ -195,6 +210,7 @@ async function _readStorefront(slug: string): Promise<Storefront | null> {
       ownerTitle: tenant.ownerTitle,
       ownerProfile: tenant.ownerProfile,
       ownerPhotoUrl: tenant.ownerPhotoUrl,
+      ownerSocials: (tenant.ownerSocials ?? null) as SocialLinks | null,
       activeOffers: offerCount,
       whiteLabel,
       introVideoUrl: tenant.introVideoUrl,

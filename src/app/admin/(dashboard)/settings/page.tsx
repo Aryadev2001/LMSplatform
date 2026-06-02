@@ -182,6 +182,7 @@ export default async function AdminSettingsPage() {
           <CardContent className="space-y-6">
             <TenantBrandingForm
               initial={{
+                name: tenantRow.name,
                 logoUrl: tenantRow.logoUrl,
                 brandPrimaryColor: tenantRow.brandPrimaryColor,
                 brandSecondaryColor: tenantRow.brandSecondaryColor,

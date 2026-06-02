@@ -60,11 +60,13 @@ export default async function CourseDetailPage({
   const { slug } = await params;
   const data = await getCourseBySlug(slug);
 
-  // Public marketplace page: any PUBLISHED, tenant-scoped course (master
-  // courses are tenant-less + draft → excluded). Cross-tenant by design.
+  // Public marketplace page: any PUBLISHED, super-admin-APPROVED,
+  // tenant-scoped course (master courses are tenant-less + draft → excluded).
+  // Cross-tenant by design. A pending-approval course 404s publicly.
   if (
     !data ||
     data.course.status !== "published" ||
+    !data.course.approvedAt ||
     !data.course.tenantId
   ) {
     notFound();

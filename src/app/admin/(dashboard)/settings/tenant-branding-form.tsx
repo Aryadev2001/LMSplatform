@@ -12,6 +12,7 @@ import { updateMyTenantBranding } from "./actions";
 
 interface Props {
   initial: {
+    name: string;
     logoUrl: string | null;
     brandPrimaryColor: string;
     brandSecondaryColor: string;
@@ -23,6 +24,7 @@ interface Props {
 export function TenantBrandingForm({ initial }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [name, setName] = useState(initial.name);
   const [logoUrl, setLogoUrl] = useState<string | null>(initial.logoUrl);
   const [primary, setPrimary] = useState(initial.brandPrimaryColor);
   const [secondary, setSecondary] = useState(initial.brandSecondaryColor);
@@ -34,6 +36,7 @@ export function TenantBrandingForm({ initial }: Props) {
   function onSave() {
     startTransition(async () => {
       const r = await updateMyTenantBranding({
+        name: name.trim(),
         logoUrl: logoUrl ?? "",
         brandPrimaryColor: primary,
         brandSecondaryColor: secondary,
@@ -51,6 +54,19 @@ export function TenantBrandingForm({ initial }: Props) {
 
   return (
     <div className="space-y-6">
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Institute / organization name</Label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. ED Trainers"
+          className="h-10 rounded-xl"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Shown as your storefront title and on every course you publish.
+        </p>
+      </div>
+
       <div className="space-y-2">
         <Label className="text-xs font-medium">Logo</Label>
         <div className="flex items-center gap-4">

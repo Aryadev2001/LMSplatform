@@ -218,6 +218,7 @@ export default async function InstituteStorefrontPage({
           title: tenant.ownerTitle,
           profile: tenant.ownerProfile,
           photoUrl: tenant.ownerPhotoUrl,
+          socials: tenant.ownerSocials,
         }}
         courses={courses}
         stats={{

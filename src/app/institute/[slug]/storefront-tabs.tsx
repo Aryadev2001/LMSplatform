@@ -11,15 +11,18 @@ import {
   ChevronDown,
   Filter,
   Star,
+  Globe,
+  ExternalLink,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
-import type { StorefrontCourse } from "@/lib/storefront";
+import type { StorefrontCourse, SocialLinks } from "@/lib/storefront";
 
 interface OwnerSummary {
   name: string | null;
   title: string | null;
   profile: string | null;
   photoUrl: string | null;
+  socials: SocialLinks | null;
 }
 
 interface StorefrontStats {
@@ -677,13 +680,53 @@ function InstructorsTab({
         </div>
         {owner.profile && (
           <p
-            className="mt-3 line-clamp-5 text-xs leading-relaxed"
+            className="mt-3 whitespace-pre-line text-xs leading-relaxed"
             style={{ color: "var(--ed-ink-2)" }}
           >
             {owner.profile}
           </p>
         )}
+        <OwnerSocialLinks socials={owner.socials} />
       </div>
+    </div>
+  );
+}
+
+const SOCIAL_META: { key: keyof SocialLinks; label: string }[] = [
+  { key: "website", label: "Website" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "twitter", label: "X / Twitter" },
+  { key: "instagram", label: "Instagram" },
+  { key: "facebook", label: "Facebook" },
+  { key: "youtube", label: "YouTube" },
+];
+
+function OwnerSocialLinks({ socials }: { socials: SocialLinks | null }) {
+  if (!socials) return null;
+  const links = SOCIAL_META.filter(
+    (s) => typeof socials[s.key] === "string" && socials[s.key]!.trim() !== "",
+  );
+  if (links.length === 0) return null;
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      {links.map((s) => (
+        <a
+          key={s.key}
+          href={socials[s.key]}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={s.label}
+          className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-colors hover:bg-[var(--ed-bg)]"
+          style={{ borderColor: "var(--ed-line)", color: "var(--ed-ink-2)" }}
+        >
+          {s.key === "website" ? (
+            <Globe className="size-3.5" />
+          ) : (
+            <ExternalLink className="size-3.5" />
+          )}
+          {s.label}
+        </a>
+      ))}
     </div>
   );
 }

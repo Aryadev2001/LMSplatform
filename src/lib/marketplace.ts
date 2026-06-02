@@ -50,6 +50,7 @@ export interface MarketInstitute {
 const liveCourseWhere = and(
   eq(programs.status, "published"),
   eq(programs.isActive, true),
+  isNotNull(programs.approvedAt), // super-admin approval gate
   isNotNull(programs.tenantId),
   ne(tenants.status, "SUSPENDED"),
 );
@@ -263,6 +264,7 @@ const _getFeaturedInstitutes = unstable_cache(
           select count(*)::int from ${programs} p
           where p.tenant_id = ${tenants.id}
             and p.status = 'published' and p.is_active = true
+            and p.approved_at is not null
         )`,
       })
       .from(tenants)

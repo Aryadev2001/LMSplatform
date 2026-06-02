@@ -92,9 +92,25 @@ export default async function AdminProgramsPage({
                     {p.durationMonths} mo
                   </TableCell>
                   <TableCell>
-                    <Badge variant={p.isActive ? "default" : "secondary"} className="font-normal">
-                      {p.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant={p.isActive ? "default" : "secondary"} className="font-normal">
+                        {p.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                      {p.status === "published" &&
+                        (p.approvedAt ? (
+                          <Badge variant="outline" className="font-normal">
+                            Approved
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="font-normal"
+                            title="Submitted — a super-admin must approve this course before it appears on the marketplace."
+                          >
+                            Pending review
+                          </Badge>
+                        ))}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {p.gatewaySyncError ? (

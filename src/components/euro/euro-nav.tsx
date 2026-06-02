@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { EuroLogo } from "./euro-logo";
 import { CartIndicator } from "./cart-button";
+import { NavAuth } from "./nav-auth";
 
 export const EURO_CATEGORIES = [
   { slug: "individuals", label: "Individuals", icon: User },
@@ -66,27 +67,7 @@ export function EuroNav() {
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <CartIndicator />
-          <Link
-            href="/partner-program"
-            className="hidden rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors hover:bg-[var(--ed-bg)] sm:block"
-            style={{ color: "var(--ed-ink-2)" }}
-          >
-            Become a Partner
-          </Link>
-          <Link
-            href="/sign-in"
-            className="rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors hover:bg-[var(--ed-bg)]"
-            style={{ color: "var(--ed-ink)" }}
-          >
-            Login
-          </Link>
-          <Link
-            href="/sign-up"
-            className="rounded-xl px-4 py-2 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
-            style={{ background: "var(--ed-gradient)" }}
-          >
-            Sign Up
-          </Link>
+          <NavAuth />
         </div>
       </div>
     </header>
