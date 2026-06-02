@@ -35,14 +35,10 @@ export const clerkAppearance = {
     formResendCodeLink: "text-[#00aeef] font-semibold hover:text-[#0091c7]",
     identityPreview: "rounded-xl border border-[#e3e9f0] bg-[#f5f8fb]",
     identityPreviewEditButton: "text-[#00aeef]",
-    // Google OAuth is disabled for now (production custom credentials not yet
-    // configured → "Authorization Error"). Hide the social buttons + the
-    // "or" divider so only email sign-in shows. Re-enable by removing these
-    // two "hidden" overrides once Google custom creds are set up in Clerk.
-    socialButtons: "hidden",
-    socialButtonsBlockButton: "hidden",
+    socialButtonsBlockButton:
+      "h-11 rounded-xl border border-[#e3e9f0] hover:bg-[#f5f8fb] text-[#243447] font-semibold normal-case transition-colors",
     socialButtonsBlockButtonText: "font-semibold",
-    dividerRow: "hidden",
+    dividerRow: "my-1",
     dividerLine: "bg-[#e3e9f0]",
     dividerText: "text-[11px] uppercase tracking-widest text-[#6b7a8b]",
     otpCodeFieldInput:

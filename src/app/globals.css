@@ -332,3 +332,17 @@
 .euro-clerk .cl-navbar {
   display: none;
 }
+
+/* Google OAuth is disabled until production custom credentials are set up
+   (clicking it returned Google "Authorization Error"). Hide the social
+   buttons + the "or" divider at the CSS layer — the two-class selector
+   out-specifies Clerk's own styles and !important beats any inline display,
+   which a className-only appearance override did not. Re-enable by deleting
+   this block once Google custom creds are configured in Clerk. */
+.euro-clerk .cl-socialButtons,
+.euro-clerk .cl-socialButtonsBlockButton,
+.euro-clerk .cl-socialButtonsIconButton,
+.euro-clerk .cl-socialButtonsBlockButton__google,
+.euro-clerk .cl-dividerRow {
+  display: none !important;
+}
