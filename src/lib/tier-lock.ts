@@ -58,6 +58,12 @@ export const FEATURES = {
     description:
       "View enrolled students' email, profile, progress and the full student detail page. Basic partners see names, course and enrollment date only.",
   },
+  live_classes: {
+    label: "Live classes",
+    minTier: "standard" as PartnerTier,
+    description:
+      "Schedule live classes (Zoom/Meet/Teams) for enrolled students. Requires the Standard plan or higher.",
+  },
   ai_services: {
     label: "AI Services",
     minTier: "premium" as PartnerTier,
@@ -183,6 +189,7 @@ export const ROUTE_MIN_TIER: Record<string, PartnerTier> = {
   "/admin/students": "basic",
   "/admin/settings": "basic",
   "/admin/programs": "basic",
+  "/admin/live": "standard",
   "/admin/enrollments": "basic",
   "/admin/payments": "basic",
   "/admin/ai-services": "premium",

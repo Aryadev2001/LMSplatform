@@ -22,7 +22,13 @@ import {
 
 export type DashRole = "admin" | "student" | "super";
 export type PartnerTier = "basic" | "standard" | "premium";
-export type FeatureKey = "ai_services" | "diagnostics" | "white_label";
+export type FeatureKey =
+  | "paid_courses"
+  | "student_details"
+  | "live_classes"
+  | "ai_services"
+  | "diagnostics"
+  | "white_label";
 
 export type NavItem = {
   label: string;
@@ -43,7 +49,13 @@ export const NAV_ITEMS: Record<DashRole, NavItem[]> = {
     { label: "Students", href: "/admin/students", icon: GraduationCap },
     { label: "Courses", href: "/admin/programs", icon: BookOpen },
     { label: "Bundles", href: "/admin/bundles", icon: Package },
-    { label: "Live Classes", href: "/admin/live", icon: CalendarClock },
+    {
+      label: "Live Classes",
+      href: "/admin/live",
+      icon: CalendarClock,
+      minTier: "standard",
+      featureKey: "live_classes",
+    },
     { label: "Enrollments", href: "/admin/enrollments", icon: ClipboardList },
     { label: "Payments", href: "/admin/payments", icon: CreditCard },
     {

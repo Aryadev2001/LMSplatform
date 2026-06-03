@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { liveSessions, programs } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
+import { hasFeature } from "@/lib/tier-lock";
 
 const Schema = z.object({
   title: z.string().trim().min(2, "Add a title").max(240),
@@ -21,6 +22,12 @@ export type LiveResult = { success: true } | { success: false; error: string };
 
 export async function createLiveSession(input: unknown): Promise<LiveResult> {
   await requireRole("admin");
+  if (!(await hasFeature("live_classes"))) {
+    return {
+      success: false,
+      error: "Live classes require the Standard plan. Upgrade in Billing to schedule them.",
+    };
+  }
   const tenantId = await requireTenantId();
   const parsed = Schema.safeParse(input);
   if (!parsed.success) {

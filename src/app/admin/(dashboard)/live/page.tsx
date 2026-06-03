@@ -3,6 +3,7 @@ import { CalendarClock, Video, ExternalLink } from "lucide-react";
 import { db } from "@/db/client";
 import { liveSessions, programs } from "@/db/schema";
 import { requireTenantId } from "@/lib/tenant";
+import { requireFeature } from "@/lib/tier-lock";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,8 @@ function fmt(d: Date) {
 }
 
 export default async function AdminLivePage() {
+  // Standard+ feature — Basic partners are redirected to the upgrade prompt.
+  await requireFeature("live_classes");
   const tenantId = await requireTenantId();
   const now = new Date();
 

@@ -22,6 +22,7 @@ type Tier = "basic" | "standard" | "premium";
 type FeatureKey =
   | "paid_courses"
   | "student_details"
+  | "live_classes"
   | "ai_services"
   | "diagnostics"
   | "white_label";
@@ -41,6 +42,11 @@ const FEATURE_INFO: Record<
     label: "Student details & contact",
     description:
       "View enrolled students' email/profile/progress + the detail page (Basic sees names only).",
+    defaultTier: "standard",
+  },
+  live_classes: {
+    label: "Live classes",
+    description: "Schedule live classes (Zoom/Meet) for enrolled students.",
     defaultTier: "standard",
   },
   ai_services: {
