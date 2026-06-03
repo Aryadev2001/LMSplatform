@@ -8,14 +8,18 @@
  * external embeds) stay as iframes — those live on the partner's chosen host,
  * not ours, so there's nothing for us to protect.
  */
-const BLOB_HOST = "blob.vercel-storage.com";
-
-/** A file we can stream-proxy: our Blob host, or a direct video file URL. */
+/**
+ * A file we can stream-proxy. Restricted to HTTPS Vercel Blob ONLY — the
+ * stream route fetches this URL server-side, so allowing arbitrary hosts (e.g.
+ * any `*.mp4` URL) would be an SSRF hole (a partner could point a lesson at an
+ * internal/metadata address). Externally-hosted videos (a partner's own CDN,
+ * YouTube, Vimeo, Loom) are rendered as direct embeds by `lessonMediaFor`,
+ * never proxied.
+ */
 export function isProxyableVideo(url: string): boolean {
   try {
     const u = new URL(url);
-    if (u.hostname.endsWith(BLOB_HOST)) return true;
-    return /\.(mp4|webm|mov|m4v|ogv)$/i.test(u.pathname);
+    return u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com");
   } catch {
     return false;
   }

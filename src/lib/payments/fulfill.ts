@@ -122,9 +122,14 @@ export async function fulfillOrderById(
       })
       .returning({ id: enrollments.id });
 
+    // stripePaymentIntentId is UNIQUE, but one Stripe PaymentIntent can cover
+    // several order lines (multi-course single-tenant cart). Suffix with the
+    // order-item id so each line's stored id is unique while still carrying
+    // the real PaymentIntent id as the prefix (avoids a unique-violation that
+    // would abort fulfilment mid-loop after the order is already marked paid).
     const piRef =
       opts.provider === "stripe" && opts.providerPaymentId
-        ? opts.providerPaymentId
+        ? `${opts.providerPaymentId}_${it.id}`
         : `pi_${opts.provider}_${Math.random().toString(36).slice(2, 12)}`;
 
     const [pay] = await db

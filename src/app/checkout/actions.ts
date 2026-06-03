@@ -263,6 +263,18 @@ export async function placeOrder(input: unknown): Promise<Result> {
   if (!loaded.ok) return { success: false, error: loaded.error };
   const ctx = loaded.ctx;
 
+  // This is the mock/no-charge grant path. It must ONLY grant a genuinely
+  // free order — a priced cart must be charged through the institute's
+  // gateway (beginCheckout), never granted for free here. Free enrolments
+  // (subtotal 0) are unaffected.
+  if (ctx.subtotalCents > 0) {
+    return {
+      success: false,
+      error:
+        "This order requires payment, but the institute hasn't enabled a payment gateway yet.",
+    };
+  }
+
   const orderId = await insertPendingOrder(ctx, "test");
   const f = await fulfillOrderById(orderId, {
     provider: "test",

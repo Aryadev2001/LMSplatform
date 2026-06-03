@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { lessons, modules, programs, enrollments, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { isProxyableVideo } from "@/lib/lesson-media";
+import { isModuleLocked } from "@/lib/drip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +35,8 @@ export async function GET(
       videoUrl: lessons.videoUrl,
       programId: modules.courseId,
       tenantId: programs.tenantId,
+      releaseAt: modules.releaseAt,
+      unlockAfterDays: modules.unlockAfterDays,
     })
     .from(lessons)
     .innerJoin(modules, eq(modules.id, lessons.moduleId))
@@ -63,7 +66,7 @@ export async function GET(
       .limit(1);
     if (dbUser) {
       const [enr] = await db
-        .select({ id: enrollments.id })
+        .select({ id: enrollments.id, createdAt: enrollments.createdAt })
         .from(enrollments)
         .where(
           and(
@@ -72,8 +75,21 @@ export async function GET(
             inArray(enrollments.status, [...ENROLLED_STATUSES]),
           ),
         )
+        .orderBy(asc(enrollments.createdAt))
         .limit(1);
-      allowed = !!enr;
+      if (enr) {
+        // Drip gate — a not-yet-released module's video stays locked even if
+        // the lesson UUID is known (the UI hiding alone is not enforcement).
+        if (
+          isModuleLocked(
+            { releaseAt: row.releaseAt, unlockAfterDays: row.unlockAfterDays },
+            enr.createdAt ?? null,
+          )
+        ) {
+          return new NextResponse("This lesson isn't available yet.", { status: 403 });
+        }
+        allowed = true;
+      }
     }
   }
   if (!allowed) return new NextResponse("You're not enrolled in this course.", { status: 403 });

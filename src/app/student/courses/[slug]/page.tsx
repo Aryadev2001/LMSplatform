@@ -10,7 +10,7 @@ import {
   examQuestions,
   examAttempts,
 } from "@/db/schema";
-import { eq, and, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, inArray, asc, desc, sql } from "drizzle-orm";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,15 +57,24 @@ export default async function StudentCourseDeliveryPage({
     .from(students)
     .where(eq(students.userId, me.id))
     .limit(1);
-  const enrolled = stu?.assignedProgramId === course.id;
 
+  // Entitlement = an actual qualifying enrollment in THIS course (not the
+  // single students.assignedProgramId slot, which only ever matches one
+  // course and locked the player for multi-course learners). Earliest row so
+  // "unlock N days after enrollment" drip anchors on first enrollment.
   const [enr] = await db
     .select({ id: enrollments.id, createdAt: enrollments.createdAt })
     .from(enrollments)
-    .where(and(eq(enrollments.userId, me.id), eq(enrollments.programId, course.id)))
-    .orderBy(desc(enrollments.createdAt))
+    .where(
+      and(
+        eq(enrollments.userId, me.id),
+        eq(enrollments.programId, course.id),
+        inArray(enrollments.status, ["paid", "account_created", "assigned"]),
+      ),
+    )
+    .orderBy(asc(enrollments.createdAt))
     .limit(1);
-  // Earliest enrollment date drives "unlock N days after enrollment" drip.
+  const enrolled = !!enr;
   const enrolledAt = enr?.createdAt ?? null;
 
   const allLessonIds = modules.flatMap((m) => m.lessons.map((l) => l.id));

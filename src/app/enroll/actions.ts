@@ -94,6 +94,17 @@ export async function completeMockPayment(
     .limit(1);
   if (!course) return { success: false, error: "Course not found." };
 
+  // This is the MOCK (no-charge) grant path and is reachable without a
+  // session, so it must only ever grant FREE courses. A paid course must go
+  // through the gated checkout + the institute's payment gateway — never be
+  // granted for free here.
+  if (course.priceCents > 0) {
+    return {
+      success: false,
+      error: "This course is paid — please enroll through checkout.",
+    };
+  }
+
   const email = enr.email.toLowerCase();
   const tenant = await getTenantFromRequest();
   const tenantId = tenant?.id ?? null;

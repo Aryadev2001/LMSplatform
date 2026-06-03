@@ -67,6 +67,7 @@ export async function POST(
       .from(paymentIntents)
       .where(
         and(
+          eq(paymentIntents.tenantId, tenantId),
           eq(paymentIntents.provider, "razorpay"),
           eq(paymentIntents.providerIntentId, rzpOrderId),
         ),

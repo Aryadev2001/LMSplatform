@@ -37,6 +37,17 @@ export async function placeBundleOrder(slug: string): Promise<BundlePurchase> {
     .limit(1);
   if (!bundle) return { ok: false, error: "This bundle isn't available." };
 
+  // This action grants access via the free/mock fulfilment path (no charge).
+  // A PAID bundle must NOT be granted for free — until the gateway charge path
+  // exists for bundles, paid bundles are not purchasable here.
+  if (bundle.priceCents > 0) {
+    return {
+      ok: false,
+      error:
+        "Paid bundles aren't available for purchase yet. Please contact the institute.",
+    };
+  }
+
   const [dbUser] = await db
     .select({ id: users.id, email: users.email, fullName: users.fullName })
     .from(users)
@@ -119,7 +130,9 @@ export async function placeBundleOrder(slug: string): Promise<BundlePurchase> {
         ? Math.floor((bundle.priceCents * p.priceCents) / sumPrices)
         : Math.floor(bundle.priceCents / progs.length);
     allocated += line;
-    const bps = Math.min(10000, Math.max(0, p.platformFeeBps ?? 1500));
+    // Clamp to 50% (5000 bps) to match checkout's clampBps — keeps partner
+    // payout accounting consistent across direct and bundle sales.
+    const bps = Math.min(5000, Math.max(0, p.platformFeeBps ?? 1500));
     const fee = Math.round((line * bps) / 10000);
     await db.insert(orderItems).values({
       orderId: order.id,

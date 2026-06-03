@@ -36,8 +36,31 @@ export interface SendEmailInput {
 const DEFAULT_FROM = "eurodigital.coach <noreply@eurodigital.coach>";
 const BRAND = { ink: "#0e1e2b", blue: "#1AADE0", green: "#6fa62a", mute: "#6b7a8b", line: "#e3e9f0" };
 
-const s = (v: unknown, fallback = ""): string =>
-  typeof v === "string" && v.trim() ? v : typeof v === "number" ? String(v) : fallback;
+/** HTML-escape a caller-supplied value before it goes into the email body —
+ *  names/course titles/etc. are user-controlled, so this prevents HTML/markup
+ *  injection in delivered mail. */
+const esc = (v: unknown, fallback = ""): string => {
+  const raw =
+    typeof v === "string" && v.trim() ? v : typeof v === "number" ? String(v) : fallback;
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
+/** Only allow http(s) URLs into an href (blocks javascript:/data: links);
+ *  falls back to the safe default. Escaped for the attribute context. */
+const url = (v: unknown, fallback: string): string => {
+  const raw = typeof v === "string" ? v.trim() : "";
+  try {
+    const u = new URL(raw);
+    if (u.protocol === "http:" || u.protocol === "https:") return esc(raw);
+  } catch {
+    /* invalid URL → use fallback */
+  }
+  return esc(fallback);
+};
 
 /** Shared, email-client-safe shell (inline styles only). */
 function layout(opts: { heading: string; body: string; cta?: { label: string; url: string } }): string {
@@ -66,11 +89,11 @@ function layout(opts: { heading: string; body: string; cta?: { label: string; ur
 function render(template: EmailTemplate, data: Record<string, unknown>): { subject: string; html: string } {
   switch (template) {
     case "dashboard_unlocked": {
-      const name = s(data.learnerName, "there");
-      const course = s(data.courseName, "your course");
-      const dashboardUrl = s(data.dashboardUrl, "https://eurodigital.coach/student");
-      const courseUrl = s(data.courseUrl);
-      const orderRef = s(data.orderRef);
+      const name = esc(data.learnerName, "there");
+      const course = esc(data.courseName, "your course");
+      const dashboardUrl = url(data.dashboardUrl, "https://eurodigital.coach/student");
+      const courseUrl = url(data.courseUrl, "");
+      const orderRef = esc(data.orderRef);
       return {
         subject: `You're enrolled in ${course} 🎉`,
         html: layout({
@@ -83,12 +106,12 @@ function render(template: EmailTemplate, data: Record<string, unknown>): { subje
       };
     }
     case "purchase_receipt": {
-      const name = s(data.learnerName, "there");
-      const amount = s(data.amount);
-      const invoiceNumber = s(data.invoiceNumber);
-      const invoiceUrl = s(data.invoiceUrl);
-      const orderRef = s(data.orderRef);
-      const itemSummary = s(data.itemSummary, "your order");
+      const name = esc(data.learnerName, "there");
+      const amount = esc(data.amount);
+      const invoiceNumber = esc(data.invoiceNumber);
+      const invoiceUrl = url(data.invoiceUrl, "");
+      const orderRef = esc(data.orderRef);
+      const itemSummary = esc(data.itemSummary, "your order");
       const cell = (l: string, r: string) =>
         `<tr><td style="padding:7px 0;color:${BRAND.mute};border-bottom:1px solid ${BRAND.line}">${l}</td><td style="padding:7px 0;text-align:right;border-bottom:1px solid ${BRAND.line}">${r}</td></tr>`;
       const rows = [
@@ -107,7 +130,7 @@ function render(template: EmailTemplate, data: Record<string, unknown>): { subje
       };
     }
     case "referral_activated": {
-      const points = s(data.points, "0");
+      const points = esc(data.points, "0");
       return {
         subject: `You earned ${points} reward points`,
         html: layout({
@@ -118,7 +141,7 @@ function render(template: EmailTemplate, data: Record<string, unknown>): { subje
       };
     }
     case "tier_upgraded": {
-      const tier = s(data.tier, "a new tier");
+      const tier = esc(data.tier, "a new tier");
       return {
         subject: `You've reached ${tier}`,
         html: layout({
@@ -129,8 +152,8 @@ function render(template: EmailTemplate, data: Record<string, unknown>): { subje
       };
     }
     case "points_expiring": {
-      const points = s(data.points, "Some");
-      const on = s(data.expiresOn);
+      const points = esc(data.points, "Some");
+      const on = esc(data.expiresOn);
       return {
         subject: `Your reward points are expiring soon`,
         html: layout({
@@ -141,8 +164,8 @@ function render(template: EmailTemplate, data: Record<string, unknown>): { subje
       };
     }
     case "tenant_invite": {
-      const tenantName = s(data.tenantName, "a workspace");
-      const inviteUrl = s(data.inviteUrl, "https://eurodigital.coach/accept-invite");
+      const tenantName = esc(data.tenantName, "a workspace");
+      const inviteUrl = url(data.inviteUrl, "https://eurodigital.coach/accept-invite");
       return {
         subject: `You've been invited to ${tenantName} on eurodigital.coach`,
         html: layout({
@@ -153,7 +176,7 @@ function render(template: EmailTemplate, data: Record<string, unknown>): { subje
       };
     }
     case "domain_configured": {
-      const domain = s(data.domain, "your custom domain");
+      const domain = esc(data.domain, "your custom domain");
       return {
         subject: `Your custom domain is live`,
         html: layout({

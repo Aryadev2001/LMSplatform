@@ -50,7 +50,7 @@ export async function getPartnerAnalytics(tenantId: string): Promise<PartnerAnal
       GROUP BY currency ORDER BY COUNT(*) DESC LIMIT 1
     `),
     db.execute(sql`
-      SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS d,
+      SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS d,
              COALESCE(SUM(amount_cents),0)::int AS v
       FROM payments
       WHERE tenant_id = ${tenantId} AND status = 'succeeded'
@@ -58,7 +58,7 @@ export async function getPartnerAnalytics(tenantId: string): Promise<PartnerAnal
       GROUP BY 1
     `),
     db.execute(sql`
-      SELECT to_char(date_trunc('day', e.created_at), 'YYYY-MM-DD') AS d,
+      SELECT to_char(date_trunc('day', e.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS d,
              COUNT(*)::int AS v
       FROM enrollments e JOIN programs p ON p.id = e.program_id
       WHERE p.tenant_id = ${tenantId} AND e.status IN ${sql.raw(PAID)}
