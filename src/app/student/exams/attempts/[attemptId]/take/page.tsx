@@ -18,16 +18,51 @@ interface OptionShape {
   isCorrect: boolean;
 }
 
-function normaliseOptions(raw: unknown): { label: string }[] {
+/** Keep each option's ORIGINAL index (position in the stored array) — grading
+ *  resolves the answer as `options[selectedIndex].isCorrect`, so the index we
+ *  submit must always be the original one even after we shuffle for display. */
+function normaliseOptions(raw: unknown): { label: string; originalIndex: number }[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((o) => {
+    .map((o, idx) => {
       if (!o || typeof o !== "object") return null;
       const r = o as Record<string, unknown>;
       const label = typeof r.label === "string" ? r.label : "";
-      return { label };
+      return { label, originalIndex: idx };
     })
-    .filter((o): o is { label: string } => o !== null && o.label.length > 0);
+    .filter(
+      (o): o is { label: string; originalIndex: number } =>
+        o !== null && o.label.length > 0,
+    );
+}
+
+/**
+ * Deterministic shuffle so answer options aren't presented in setup order (a
+ * teacher who always puts the correct answer first must NOT make it always the
+ * first option for students). Seeded by attemptId + questionId so the order is:
+ *   - stable across refreshes within one attempt (no jumping while answering),
+ *   - different per attempt/student (and re-shuffled on a retake).
+ * xfnv1a hash → mulberry32 PRNG → Fisher–Yates.
+ */
+function seededShuffle<T>(arr: T[], seedStr: string): T[] {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 16777619);
+  }
+  let a = h >>> 0;
+  const rand = () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
 export default async function TakeExamPage({
@@ -96,7 +131,10 @@ export default async function TakeExamPage({
   const questions: TakeQuestion[] = questionRows.map((q) => ({
     id: q.id,
     question: q.question,
-    options: normaliseOptions(q.options),
+    // Shuffle the display order (stable per attempt+question); each option
+    // still carries its real originalIndex, so the submitted answer + grading
+    // are unaffected by the reorder.
+    options: seededShuffle(normaliseOptions(q.options), `${attempt.id}:${q.id}`),
     marks: q.marks,
   }));
 

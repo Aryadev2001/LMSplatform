@@ -16,7 +16,9 @@ import { submitAttempt } from "../../../actions";
 export interface TakeQuestion {
   id: string;
   question: string;
-  options: { label: string }[];
+  /** Display order may be shuffled; `originalIndex` is the stable value we
+   *  submit + grade against (the option's position in the stored array). */
+  options: { label: string; originalIndex: number }[];
   marks: number;
 }
 
@@ -229,13 +231,13 @@ function QuestionCard({
       </div>
       <p className="mt-2 text-sm font-semibold leading-snug">{q.question}</p>
       <ul className="mt-4 space-y-2">
-        {q.options.map((o, i) => {
-          const active = selected === i;
+        {q.options.map((o) => {
+          const active = selected === o.originalIndex;
           return (
-            <li key={i}>
+            <li key={o.originalIndex}>
               <button
                 type="button"
-                onClick={() => onSelect(i)}
+                onClick={() => onSelect(o.originalIndex)}
                 className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
                   active
                     ? "border-foreground bg-foreground/5"
