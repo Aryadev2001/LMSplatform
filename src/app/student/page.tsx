@@ -13,6 +13,7 @@ import { requireRole, getCurrentUser } from "@/lib/auth";
 import { db } from "@/db/client";
 import { students, users } from "@/db/schema";
 import { getStudentSnapshot } from "@/lib/student";
+import { CourseCard } from "@/components/student/course-card";
 import { AI_SERVICES, formatAiPrice } from "@/lib/ai-services";
 
 export const dynamic = "force-dynamic";
@@ -273,12 +274,12 @@ export default async function StudentDashboard() {
       </div>
 
       {/* Continue learning */}
-      <div
-        className="rounded-2xl border bg-white p-6"
-        style={{ borderColor: "var(--ed-line)" }}
-      >
+      <div>
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold" style={{ color: "var(--ed-ink)" }}>
+          <h2
+            className="font-display text-lg font-extrabold tracking-tight"
+            style={{ color: "var(--ed-ink)" }}
+          >
             Continue learning
           </h2>
           <Link
@@ -291,7 +292,7 @@ export default async function StudentDashboard() {
         </div>
         {snap.courses.length === 0 ? (
           <div
-            className="mt-4 rounded-xl border border-dashed py-10 text-center text-sm"
+            className="mt-4 rounded-2xl border border-dashed bg-white py-12 text-center text-sm"
             style={{ borderColor: "var(--ed-line)", color: "var(--ed-mute)" }}
           >
             No courses yet —{" "}
@@ -305,39 +306,9 @@ export default async function StudentDashboard() {
             .
           </div>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {snap.courses.slice(0, 3).map((co) => (
-              <Link
-                key={co.enrollmentId}
-                href={co.slug ? `/student/courses/${co.slug}` : "/student/courses"}
-                className="rounded-xl border p-4 transition-shadow hover:shadow-md"
-                style={{ borderColor: "var(--ed-line)" }}
-              >
-                <div
-                  className="line-clamp-2 text-sm font-bold"
-                  style={{ color: "var(--ed-ink)" }}
-                >
-                  {co.name}
-                </div>
-                <div
-                  className="mt-3 h-1.5 w-full overflow-hidden rounded-full"
-                  style={{ background: "var(--ed-bg)" }}
-                >
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${co.percent}%`,
-                      background: "var(--ed-gradient)",
-                    }}
-                  />
-                </div>
-                <div
-                  className="mt-1.5 text-[11px]"
-                  style={{ color: "var(--ed-mute)" }}
-                >
-                  {co.percent}% · {co.completed ? "Completed" : "In progress"}
-                </div>
-              </Link>
+              <CourseCard key={co.enrollmentId} co={co} />
             ))}
           </div>
         )}

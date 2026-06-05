@@ -1,15 +1,14 @@
 import Link from "next/link";
 import {
   BookOpen,
-  ArrowRight,
   CheckCircle2,
   PlayCircle,
-  Building2,
   GraduationCap,
   Trophy,
 } from "lucide-react";
 import { requireRole } from "@/lib/auth";
-import { getStudentSnapshot, type StudentCourse } from "@/lib/student";
+import { getStudentSnapshot } from "@/lib/student";
+import { CourseCard } from "@/components/student/course-card";
 
 export const dynamic = "force-dynamic";
 
@@ -133,104 +132,3 @@ function Stat({
   );
 }
 
-function CourseCard({ co }: { co: StudentCourse }) {
-  const href = co.slug ? `/student/courses/${co.slug}` : "#";
-  const initial = co.name.trim().charAt(0).toUpperCase() || "•";
-
-  return (
-    <Link
-      href={href}
-      className="group flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
-      style={{ borderColor: "var(--ed-line)" }}
-    >
-      {/* Cover */}
-      <div className="relative h-36 overflow-hidden" style={{ background: "var(--ed-gradient)" }}>
-        {co.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={co.imageUrl}
-            alt={co.name}
-            className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <>
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-30"
-              style={{ background: "var(--ed-halftone)" }}
-            />
-            <span className="absolute inset-0 flex items-center justify-center text-6xl font-black text-white/90">
-              {initial}
-            </span>
-          </>
-        )}
-        {/* gradient scrim for legibility */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent" />
-
-        {/* institute chip */}
-        {co.instituteName && (
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground backdrop-blur">
-            <Building2 className="size-3" /> {co.instituteName}
-          </span>
-        )}
-
-        {/* status pill */}
-        {co.completed ? (
-          <span
-            className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white"
-            style={{ background: "var(--ed-green-dark)" }}
-          >
-            <Trophy className="size-3" /> Completed
-          </span>
-        ) : co.percent > 0 ? (
-          <span className="absolute right-3 top-3 inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold tabular-nums text-foreground backdrop-blur">
-            {co.percent}%
-          </span>
-        ) : (
-          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground backdrop-blur">
-            New
-          </span>
-        )}
-      </div>
-
-      {/* Body */}
-      <div className="flex flex-1 flex-col p-5">
-        <h3
-          className="line-clamp-2 text-base font-extrabold leading-snug"
-          style={{ color: "var(--ed-ink)" }}
-        >
-          {co.name}
-        </h3>
-        {co.tagline && (
-          <p className="mt-1.5 line-clamp-2 text-xs" style={{ color: "var(--ed-mute)" }}>
-            {co.tagline}
-          </p>
-        )}
-
-        <div className="mt-auto pt-5">
-          {/* progress */}
-          <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--ed-bg)" }}>
-            <div
-              className="h-full rounded-full transition-all"
-              style={{ width: `${co.percent}%`, background: "var(--ed-gradient)" }}
-            />
-          </div>
-          <div className="mt-2.5 flex items-center justify-between">
-            <span className="text-[12px] font-semibold" style={{ color: "var(--ed-mute)" }}>
-              {co.completed
-                ? `${co.totalLessons} lessons · done`
-                : `${co.doneLessons}/${co.totalLessons} lessons`}
-            </span>
-            <span
-              className="inline-flex items-center gap-1 text-[12px] font-bold transition-transform group-hover:translate-x-0.5"
-              style={{ color: "var(--ed-blue)" }}
-            >
-              {co.completed ? "Review" : co.percent > 0 ? "Continue" : "Start"}
-              <ArrowRight className="size-3.5" />
-            </span>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
