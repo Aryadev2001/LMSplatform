@@ -128,15 +128,23 @@ export default async function TakeExamPage({
     .where(eq(examQuestions.examId, exam.id))
     .orderBy(asc(examQuestions.orderIndex));
 
-  const questions: TakeQuestion[] = questionRows.map((q) => ({
-    id: q.id,
-    question: q.question,
-    // Shuffle the display order (stable per attempt+question); each option
-    // still carries its real originalIndex, so the submitted answer + grading
-    // are unaffected by the reorder.
-    options: seededShuffle(normaliseOptions(q.options), `${attempt.id}:${q.id}`),
-    marks: q.marks,
-  }));
+  // Shuffle the QUESTION order per attempt (stable across refreshes within an
+  // attempt, different per attempt/student). Grading and the result page key
+  // off questionId, so reordering here changes only what the student sees, not
+  // scoring. Questions are fetched in canonical orderIndex order first so the
+  // seeded permutation is reproducible.
+  const questions: TakeQuestion[] = seededShuffle(
+    questionRows.map((q) => ({
+      id: q.id,
+      question: q.question,
+      // Shuffle each question's options too (stable per attempt+question); each
+      // option still carries its real originalIndex, so the submitted answer +
+      // grading are unaffected by the reorder.
+      options: seededShuffle(normaliseOptions(q.options), `${attempt.id}:${q.id}`),
+      marks: q.marks,
+    })),
+    `${attempt.id}:questions`,
+  );
 
   // Existing answers (e.g. if they refreshed mid-attempt — we don't yet
   // persist intermediate answers, but pass through whatever's on the row).
