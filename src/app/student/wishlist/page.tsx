@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Heart,
@@ -10,13 +11,78 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useWishlist, type WishItem } from "@/lib/wishlist";
+import { useWishlist } from "@/lib/wishlist";
 import { useCart } from "@/lib/cart";
 import { formatCurrency } from "@/lib/format";
+import { revalidateWishlist, type FreshWishItem } from "./actions";
+
+/** What the card renders — stored fields, upgraded with fresh server data
+ *  (real cover image + current price) once revalidation returns. */
+interface CardItem {
+  programId: string;
+  slug: string | null;
+  title: string;
+  imageUrl: string | null;
+  priceCents: number;
+  currency: string;
+  instituteName: string | null;
+  instituteSlug: string | null;
+  loading: boolean;
+}
 
 export default function WishlistPage() {
   const { items, remove } = useWishlist();
   const { add, items: cart } = useCart();
+
+  // Fresh server data keyed by programId; null until the first revalidation
+  // returns (we render stored data in the meantime, then upgrade in place).
+  const [fresh, setFresh] = useState<Map<string, FreshWishItem> | null>(null);
+
+  const idsKey = useMemo(
+    () => items.map((i) => i.programId).sort().join(","),
+    [items],
+  );
+
+  useEffect(() => {
+    const ids = idsKey ? idsKey.split(",") : [];
+    if (ids.length === 0) {
+      setFresh(new Map());
+      return;
+    }
+    let active = true;
+    revalidateWishlist(ids)
+      .then((rows) => {
+        if (!active) return;
+        setFresh(new Map(rows.map((r) => [r.programId, r])));
+        // Prune anything saved that's no longer publicly available.
+        const gone = ids.filter((id) => !rows.some((r) => r.programId === id));
+        if (gone.length) {
+          gone.forEach((id) => remove(id));
+          toast(
+            `${gone.length} saved course${gone.length === 1 ? "" : "s"} ${gone.length === 1 ? "is" : "are"} no longer available — removed.`,
+          );
+        }
+      })
+      .catch(() => active && setFresh(new Map()));
+    return () => {
+      active = false;
+    };
+    // Re-run whenever the saved set changes.
+  }, [idsKey, remove]);
+
+  const display: CardItem[] = useMemo(() => {
+    return items
+      .map((w): CardItem | null => {
+        if (fresh === null) {
+          // Still revalidating — show stored data (no image yet).
+          return { ...w, imageUrl: null, loading: true };
+        }
+        const f = fresh.get(w.programId);
+        if (!f) return null; // unavailable → pruned
+        return { ...f, loading: false };
+      })
+      .filter((x): x is CardItem => x !== null);
+  }, [items, fresh]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -33,7 +99,7 @@ export default function WishlistPage() {
             Wishlist
           </h1>
           <p className="mt-1 text-sm" style={{ color: "var(--ed-mute)" }}>
-            {items.length} saved course{items.length === 1 ? "" : "s"} — ready when you are.
+            {display.length} saved course{display.length === 1 ? "" : "s"} — live prices, ready when you are.
           </p>
         </div>
         <Link
@@ -45,7 +111,7 @@ export default function WishlistPage() {
         </Link>
       </div>
 
-      {items.length === 0 ? (
+      {display.length === 0 ? (
         <div
           className="flex flex-col items-center gap-4 rounded-3xl border border-dashed bg-white py-20 text-center"
           style={{ borderColor: "var(--ed-line)" }}
@@ -74,7 +140,7 @@ export default function WishlistPage() {
         </div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {items.map((w) => (
+          {display.map((w) => (
             <WishlistCard
               key={w.programId}
               w={w}
@@ -86,8 +152,8 @@ export default function WishlistPage() {
                   title: w.title,
                   priceCents: w.priceCents,
                   currency: w.currency,
-                  instituteSlug: w.instituteSlug,
-                  instituteName: w.instituteName,
+                  instituteSlug: w.instituteSlug ?? "",
+                  instituteName: w.instituteName ?? "",
                 });
                 toast.success(`${w.title} added to cart`);
               }}
@@ -106,7 +172,7 @@ function WishlistCard({
   onAdd,
   onRemove,
 }: {
-  w: WishItem;
+  w: CardItem;
   inCart: boolean;
   onAdd: () => void;
   onRemove: () => void;
@@ -126,14 +192,25 @@ function WishlistCard({
         className="relative block h-36 overflow-hidden"
         style={{ background: "var(--ed-gradient)" }}
       >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-30"
-          style={{ background: "var(--ed-halftone)" }}
-        />
-        <span className="absolute inset-0 flex items-center justify-center text-6xl font-black text-white/90">
-          {initial}
-        </span>
+        {w.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={w.imageUrl}
+            alt={w.title}
+            className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-30"
+              style={{ background: "var(--ed-halftone)" }}
+            />
+            <span className="absolute inset-0 flex items-center justify-center text-6xl font-black text-white/90">
+              {initial}
+            </span>
+          </>
+        )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent" />
 
         {w.instituteName && (
@@ -143,7 +220,7 @@ function WishlistCard({
         )}
 
         <span
-          className="absolute right-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold tabular-nums backdrop-blur"
+          className={`absolute right-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold tabular-nums backdrop-blur ${w.loading ? "animate-pulse" : ""}`}
           style={
             isFree
               ? { background: "var(--ed-green-dark)", color: "white" }
