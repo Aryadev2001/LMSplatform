@@ -200,7 +200,7 @@ export default async function CourseDetailPage({
         className="relative overflow-hidden border-b"
         style={{ borderColor: "var(--ed-line)" }}
       >
-        <div className="absolute inset-0 opacity-50" style={{ background: "var(--ed-halftone)" }} />
+        <div className="pointer-events-none absolute inset-0 opacity-50" style={{ background: "var(--ed-halftone)" }} />
         <div className="relative mx-auto max-w-7xl px-6 py-10">
           <nav className="mb-5 flex flex-wrap items-center gap-1.5 text-xs font-medium" style={{ color: "var(--ed-mute)" }}>
             <Link href="/" className="hover:underline">Home</Link>
@@ -645,10 +645,10 @@ export default async function CourseDetailPage({
 
           {/* Certificate */}
           <section
-            className="overflow-hidden rounded-2xl p-8 text-white"
+            className="relative overflow-hidden rounded-2xl p-8 text-white"
             style={{ background: "var(--ed-ink)" }}
           >
-            <div className="absolute inset-0 opacity-30" style={{ background: "var(--ed-halftone)" }} />
+            <div className="pointer-events-none absolute inset-0 opacity-30" style={{ background: "var(--ed-halftone)" }} />
             <div className="relative flex items-start gap-4">
               <Award className="size-9 shrink-0" style={{ color: "var(--ed-green)" }} />
               <div>

@@ -94,7 +94,7 @@ export default async function InstituteStorefrontPage({
       >
         <div
           aria-hidden
-          className="absolute inset-0 opacity-25"
+          className="pointer-events-none absolute inset-0 opacity-25"
           style={{
             background:
               "repeating-linear-gradient(135deg, transparent 0 14px, rgba(255,255,255,0.04) 14px 16px)",

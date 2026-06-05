@@ -118,7 +118,7 @@ export default function PartnerProgramPage() {
       >
         <div
           aria-hidden
-          className="absolute inset-0 opacity-30"
+          className="pointer-events-none absolute inset-0 opacity-30"
           style={{ background: "var(--ed-halftone)" }}
         />
         <div className="relative mx-auto max-w-5xl px-6 py-20 text-center md:py-28">

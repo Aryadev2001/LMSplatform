@@ -188,7 +188,7 @@ export default async function ExplorePage({
         className="relative overflow-hidden border-b"
         style={{ borderColor: "var(--ed-line)" }}
       >
-        <div className="absolute inset-0 opacity-50" style={{ background: "var(--ed-halftone)" }} />
+        <div className="pointer-events-none absolute inset-0 opacity-50" style={{ background: "var(--ed-halftone)" }} />
         <div className="relative mx-auto max-w-7xl px-6 py-12">
           <div className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--ed-blue)" }}>
             {cat ? cat.label : sp.q ? "Search results" : "Browse all"}

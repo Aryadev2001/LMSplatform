@@ -148,7 +148,7 @@ export default async function HomePage() {
           className="relative overflow-hidden rounded-3xl p-10 text-center text-white md:p-14"
           style={{ background: "var(--ed-ink)" }}
         >
-          <div className="absolute inset-0 opacity-40" style={{ background: "var(--ed-halftone)" }} />
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: "var(--ed-halftone)" }} />
           <div className="relative">
             <h2 className="text-2xl font-extrabold md:text-3xl">
               Are you an institute? Get a branded storefront in minutes.
