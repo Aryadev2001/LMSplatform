@@ -22,23 +22,18 @@ export default async function CheckoutPage() {
       .limit(1);
     points = u?.points ?? 0;
 
-    // Profile-required gate. A student MUST complete /student/profile
-    // AND OTP-verify their phone before paying. Super-admins /
-    // partner-admins (impersonating or otherwise) bypass.
+    // Profile-required gate. A student completes the one-time /student/profile
+    // form before checking out (we collect their phone there, but do NOT block
+    // the purchase on a separate phone-OTP step). Super-admins / partner-admins
+    // (impersonating or otherwise) bypass.
     if (u && me.role === "student") {
       const [st] = await db
-        .select({
-          profileCompletedAt: students.profileCompletedAt,
-          phoneVerifiedAt: students.phoneVerifiedAt,
-        })
+        .select({ profileCompletedAt: students.profileCompletedAt })
         .from(students)
         .where(eq(students.userId, u.id))
         .limit(1);
       if (!st?.profileCompletedAt) {
         redirect("/student/profile?required=1&returnTo=/checkout");
-      }
-      if (!st?.phoneVerifiedAt) {
-        redirect("/student/profile?required=phone&returnTo=/checkout");
       }
     }
   }

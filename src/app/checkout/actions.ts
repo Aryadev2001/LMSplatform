@@ -263,16 +263,20 @@ export async function placeOrder(input: unknown): Promise<Result> {
   if (!loaded.ok) return { success: false, error: loaded.error };
   const ctx = loaded.ctx;
 
-  // This is the mock/no-charge grant path. It must ONLY grant a genuinely
-  // free order — a priced cart must be charged through the institute's
-  // gateway (beginCheckout), never granted for free here. Free enrolments
-  // (subtotal 0) are unaffected.
-  if (ctx.subtotalCents > 0) {
-    return {
-      success: false,
-      error:
-        "This order requires payment, but the institute hasn't enabled a payment gateway yet.",
-    };
+  // Mock/test grant path (no real charge). A priced order may use it ONLY
+  // while the institute has not connected a live gateway — in that pre-gateway
+  // phase the platform grants access in test mode so institutes can sell
+  // immediately. The moment a gateway IS connected, a priced order must go
+  // through it (beginCheckout opens the real charge), so we refuse the mock
+  // grant here to prevent bypassing a live gateway.
+  if (ctx.subtotalCents > 0 && ctx.singleTenant) {
+    const gw = await resolveTenantGateway(ctx.tenantId);
+    if (gw.provider !== "none") {
+      return {
+        success: false,
+        error: "Please complete payment to enroll in this course.",
+      };
+    }
   }
 
   const orderId = await insertPendingOrder(ctx, "test");

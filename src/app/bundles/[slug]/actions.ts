@@ -58,17 +58,12 @@ export async function placeBundleOrder(slug: string): Promise<BundlePurchase> {
   // Same form-then-pay gate as course checkout (students only).
   if (me.role === "student") {
     const [st] = await db
-      .select({
-        profile: students.profileCompletedAt,
-        phone: students.phoneVerifiedAt,
-      })
+      .select({ profile: students.profileCompletedAt })
       .from(students)
       .where(eq(students.userId, dbUser.id))
       .limit(1);
     if (!st?.profile)
       return { ok: false, needsProfile: `/student/profile?required=1&returnTo=/bundles/${slug}` };
-    if (!st?.phone)
-      return { ok: false, needsProfile: `/student/profile?required=phone&returnTo=/bundles/${slug}` };
   }
 
   // Component courses — only published + approved ones are sellable.
