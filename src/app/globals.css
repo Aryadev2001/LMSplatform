@@ -257,6 +257,9 @@
 
   /* Subtle grid for marketing pages */
   .bg-grid-soft {
+    /* Purely decorative backdrop — must never intercept clicks, even in the
+       transparent gaps where it sits on top of nothing. */
+    pointer-events: none;
     background-image:
       linear-gradient(to right, oklch(from var(--foreground) l c h / 0.04) 1px, transparent 1px),
       linear-gradient(to bottom, oklch(from var(--foreground) l c h / 0.04) 1px, transparent 1px);
