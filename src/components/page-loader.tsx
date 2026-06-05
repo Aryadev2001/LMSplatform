@@ -1,41 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { PencilLoader } from "@/components/ui/loader-1";
 
 /**
- * Global page preloader. Renders a full-screen pencil loader on the very first
- * load and briefly on every route change, then fades out once the page is
- * ready. Kept smooth + self-healing:
- *  - minimum visible time so it never flashes,
- *  - initial load waits for `window load` (assets) with a safety cap so it can
- *    never get stuck,
- *  - route changes hide after the minimum time (the new view is already
- *    rendered by the time the pathname updates).
+ * Global page preloader — shows ONLY on a full/initial page load (first paint,
+ * hard refresh, or direct URL), then fades out once the page is ready. It does
+ * NOT fire on client-side route changes: the root layout persists across those,
+ * so this component mounts once per real document load and never re-shows on
+ * in-app navigation.
  *
- * Uses `usePathname` only (not `useSearchParams`), so it needs no Suspense
- * boundary and won't opt routes into client-side bailout.
+ * Self-healing: the initial load waits for `window load` (assets) with a safety
+ * cap so it can never hang, plus a minimum visible time so it never flashes.
  */
 const MIN_VISIBLE_MS = 650;
 const FADE_MS = 450;
 const SAFETY_MS = 4000;
 
 export function PageLoader() {
-  const pathname = usePathname();
   const [show, setShow] = useState(true);
   const [hiding, setHiding] = useState(false);
-  const firstRun = useRef(true);
 
   useEffect(() => {
-    // Show on first mount and on every pathname change.
-    setHiding(false);
-    setShow(true);
     const startedAt = Date.now();
-    const isFirst = firstRun.current;
-    firstRun.current = false;
-
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
     let unmountTimer: ReturnType<typeof setTimeout> | undefined;
     let safetyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -49,8 +37,8 @@ export function PageLoader() {
       }, wait);
     };
 
-    if (isFirst && typeof document !== "undefined" && document.readyState !== "complete") {
-      // Initial full load — wait for assets, with a safety cap so we never hang.
+    if (typeof document !== "undefined" && document.readyState !== "complete") {
+      // Wait for assets to finish, with a safety cap so we never hang.
       onLoad = () => beginHide();
       window.addEventListener("load", onLoad, { once: true });
       safetyTimer = setTimeout(beginHide, SAFETY_MS);
@@ -64,7 +52,7 @@ export function PageLoader() {
       if (safetyTimer) clearTimeout(safetyTimer);
       if (onLoad) window.removeEventListener("load", onLoad);
     };
-  }, [pathname]);
+  }, []);
 
   if (!show) return null;
 
