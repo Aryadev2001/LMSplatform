@@ -1,6 +1,7 @@
-import { and, eq, isNull, isNotNull, sql, desc } from "drizzle-orm";
+import { and, eq, ne, isNull, isNotNull, sql, desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { programs, tenants, coursePushHistory } from "@/db/schema";
+import { InstituteSales } from "./institute-sales";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -83,6 +84,32 @@ export default async function SuperCoursesPage() {
     })
     .from(coursePushHistory);
 
+  // B2B institute sales/invoices (interim until Stripe collects automatically).
+  const saleRows = await db
+    .select({
+      id: coursePushHistory.id,
+      courseName: programs.name,
+      instituteName: tenants.name,
+      priceCents: coursePushHistory.priceCents,
+      currency: coursePushHistory.currency,
+      status: coursePushHistory.saleStatus,
+      soldAt: coursePushHistory.pushedAt,
+    })
+    .from(coursePushHistory)
+    .innerJoin(programs, eq(programs.id, coursePushHistory.masterCourseId))
+    .innerJoin(tenants, eq(tenants.id, coursePushHistory.targetTenantId))
+    .where(ne(coursePushHistory.saleStatus, "free"))
+    .orderBy(desc(coursePushHistory.pushedAt));
+  const sales = saleRows.map((s) => ({
+    id: s.id,
+    courseName: s.courseName,
+    instituteName: s.instituteName,
+    priceCents: s.priceCents ?? 0,
+    currency: s.currency,
+    status: s.status,
+    soldAt: s.soldAt.toISOString(),
+  }));
+
   return (
     <div>
       <PageHeader
@@ -146,6 +173,8 @@ export default async function SuperCoursesPage() {
           Read-only role — promote/push/sync is disabled for you.
         </p>
       )}
+
+      <InstituteSales sales={sales} writable={writable} />
 
       <MasterCourseManager
         writable={writable}

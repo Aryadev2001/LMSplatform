@@ -1050,6 +1050,13 @@ export const coursePushHistory = pgTable(
     }),
     pushedAt: timestamp("pushed_at", { withTimezone: true }).defaultNow().notNull(),
     syncedAt: timestamp("synced_at", { withTimezone: true }),
+    // B2B sale (interim invoice): a paid sale of a master course to an institute.
+    // saleStatus 'free' = a plain free push; 'pending' = sold, unpaid (settles
+    // when the platform gateway is connected, or marked paid manually); 'paid'.
+    priceCents: integer("price_cents"),
+    currency: varchar("currency", { length: 3 }).notNull().default("INR"),
+    saleStatus: varchar("sale_status", { length: 16 }).notNull().default("free"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
   },
   (t) => [
     index("course_push_master_idx").on(t.masterCourseId),

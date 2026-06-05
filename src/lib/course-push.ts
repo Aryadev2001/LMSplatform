@@ -291,6 +291,47 @@ export async function unpublishMasterFromStudents(masterId: string): Promise<voi
     );
 }
 
+/**
+ * Sell a master course to ONE institute (interim B2B invoice). Assigns the
+ * course immediately (the normal push) and records the push-history row as a
+ * PENDING sale at the given price — it settles when the platform gateway is
+ * connected, or via `markInstituteSalePaid`. (A free hand-off is still the
+ * plain `pushMasterToTenant`.)
+ */
+export async function sellMasterToInstitute(params: {
+  masterId: string;
+  tenantId: string;
+  priceCents: number;
+  soldByUserId: string | null;
+}): Promise<{ copyId: string }> {
+  const { copyId } = await pushMasterToTenant({
+    masterId: params.masterId,
+    tenantId: params.tenantId,
+    pushedByUserId: params.soldByUserId,
+  });
+  await db
+    .update(coursePushHistory)
+    .set({
+      priceCents: params.priceCents,
+      saleStatus: params.priceCents > 0 ? "pending" : "free",
+    })
+    .where(
+      and(
+        eq(coursePushHistory.masterCourseId, params.masterId),
+        eq(coursePushHistory.targetTenantId, params.tenantId),
+      ),
+    );
+  return { copyId };
+}
+
+/** Mark a pending institute sale as paid (manual settlement until Stripe). */
+export async function markInstituteSalePaid(saleId: string): Promise<void> {
+  await db
+    .update(coursePushHistory)
+    .set({ saleStatus: "paid", paidAt: new Date() })
+    .where(eq(coursePushHistory.id, saleId));
+}
+
 /** Re-sync a master into every tenant that already has a copy. */
 export async function syncMasterToAllTenants(params: {
   masterId: string;

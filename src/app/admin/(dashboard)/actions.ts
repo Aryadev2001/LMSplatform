@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { db } from "@/db/client";
-import { programs, students, users, tenants } from "@/db/schema";
+import { programs, students, users, tenants, enrollments } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { requireRole, isStudentRole } from "@/lib/auth";
@@ -316,6 +316,32 @@ export async function assignStudent(input: z.infer<typeof AssignSchema>) {
       .update(students)
       .set({ assignedProgramId: parsed.data.programId })
       .where(eq(students.userId, parsed.data.studentUserId));
+  }
+
+  // Create the REAL entitlement. The dashboard ("My courses") and the course
+  // player gate on an `enrollments` row, NOT the legacy assignedProgramId slot,
+  // so without this an admin-assigned course never appeared for the student.
+  if (parsed.data.programId) {
+    const u = existing[0];
+    const [enr] = await db
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.userId, parsed.data.studentUserId),
+          eq(enrollments.programId, parsed.data.programId),
+        ),
+      )
+      .limit(1);
+    if (!enr) {
+      await db.insert(enrollments).values({
+        fullName: u.fullName ?? u.email,
+        email: u.email,
+        programId: parsed.data.programId,
+        status: "assigned",
+        userId: parsed.data.studentUserId,
+      });
+    }
   }
 
   revalidatePath("/admin/students");

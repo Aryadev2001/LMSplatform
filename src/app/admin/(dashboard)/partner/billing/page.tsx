@@ -1,12 +1,12 @@
-import { eq } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { db } from "@/db/client";
-import { tenants } from "@/db/schema";
+import { tenants, coursePushHistory, programs } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { requireTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatCurrency } from "@/lib/format";
 import { CheckCircle2, AlertCircle, XCircle, Clock } from "lucide-react";
 import { platformStripeConfigured } from "@/lib/billing/platform-stripe";
 import { BillingActions } from "./upgrade-buttons";
@@ -57,6 +57,29 @@ export default async function BillingPage({
     .from(tenants)
     .where(eq(tenants.id, tenantId))
     .limit(1);
+
+  // Course invoices EuroDigital raised to this institute (B2B master-course sales).
+  const courseInvoices = await db
+    .select({
+      id: coursePushHistory.id,
+      courseName: programs.name,
+      priceCents: coursePushHistory.priceCents,
+      currency: coursePushHistory.currency,
+      status: coursePushHistory.saleStatus,
+      soldAt: coursePushHistory.pushedAt,
+    })
+    .from(coursePushHistory)
+    .innerJoin(programs, eq(programs.id, coursePushHistory.masterCourseId))
+    .where(
+      and(
+        eq(coursePushHistory.targetTenantId, tenantId),
+        ne(coursePushHistory.saleStatus, "free"),
+      ),
+    )
+    .orderBy(desc(coursePushHistory.pushedAt));
+  const courseDue = courseInvoices
+    .filter((i) => i.status === "pending")
+    .reduce((a, i) => a + (i.priceCents ?? 0), 0);
 
   const tier = (row?.tier ?? "basic") as "basic" | "standard" | "premium";
   const status = row?.billingStatus ?? "none";
@@ -144,6 +167,53 @@ export default async function BillingPage({
         hasSubscription={hasSubscription}
         configured={configured}
       />
+
+      {courseInvoices.length > 0 && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+            <CardTitle className="text-sm">Course invoices from EuroDigital</CardTitle>
+            {courseDue > 0 && (
+              <Badge variant="destructive" className="font-normal">
+                {formatCurrency(courseDue, courseInvoices[0].currency)} due
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y">
+              {courseInvoices.map((i) => (
+                <li key={i.id} className="flex flex-wrap items-center gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold">{i.courseName}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      Acquired {formatDate(i.soldAt)}
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold tabular-nums">
+                    {formatCurrency(i.priceCents ?? 0, i.currency)}
+                  </span>
+                  {i.status === "paid" ? (
+                    <Badge
+                      className="border-transparent font-normal text-white"
+                      style={{ background: "var(--ed-green-dark)" }}
+                    >
+                      <CheckCircle2 className="size-3" /> Paid
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="font-normal">
+                      Due
+                    </Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Courses EuroDigital sold to your institute. Payment is collected
+              once the platform gateway is connected — your account manager will
+              confirm settlement.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div
         className="rounded-xl border border-dashed p-3 text-[11px] leading-relaxed"

@@ -14,6 +14,8 @@ import {
   syncMasterToAllTenants,
   publishMasterToStudents,
   unpublishMasterFromStudents,
+  sellMasterToInstitute,
+  markInstituteSalePaid,
   createMasterCourse as authorMasterCourse,
 } from "@/lib/course-push";
 import { requireSuper, type SuperRole, CANONICAL_ADMIN } from "@/lib/auth";
@@ -517,6 +519,66 @@ export async function unpublishMasterCourseFromStudents(input: unknown): Promise
       action: "course.unpublish_students",
       targetType: "program",
       targetId: parsed.data.masterId,
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed" };
+  }
+  revalidatePath("/super-admin/courses");
+  return { success: true };
+}
+
+const SellInstituteSchema = z.object({
+  masterId: z.string().uuid(),
+  tenantId: z.string().uuid(),
+  priceRupees: z.coerce.number().int().min(1).max(10_000_000),
+});
+
+/** Sell a master course to ONE institute — assigns it now + records a pending
+ *  B2B invoice (settles when the platform gateway is connected). */
+export async function sellMasterCourseToInstitute(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role — you cannot sell courses." };
+  }
+  const parsed = SellInstituteSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Pick an institute and price." };
+  }
+  const actor = await actorUserId(me.userId);
+  try {
+    await sellMasterToInstitute({
+      masterId: parsed.data.masterId,
+      tenantId: parsed.data.tenantId,
+      priceCents: parsed.data.priceRupees * 100,
+      soldByUserId: actor,
+    });
+    await recordAudit({
+      action: "course.sell_institute",
+      targetType: "program",
+      targetId: parsed.data.masterId,
+      metadata: { tenantId: parsed.data.tenantId, priceRupees: parsed.data.priceRupees },
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Sale failed" };
+  }
+  revalidatePath("/super-admin/courses");
+  return { success: true };
+}
+
+/** Mark a pending institute sale as paid (manual settlement until Stripe). */
+export async function markInstituteSalePaidAction(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role." };
+  }
+  const parsed = z.object({ saleId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
+  try {
+    await markInstituteSalePaid(parsed.data.saleId);
+    await recordAudit({
+      action: "course.sale_paid",
+      targetType: "course_push_history",
+      targetId: parsed.data.saleId,
     });
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed" };

@@ -3,7 +3,16 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Sparkles, Upload, RefreshCw, GraduationCap, X } from "lucide-react";
+import {
+  Loader2,
+  Sparkles,
+  Upload,
+  RefreshCw,
+  GraduationCap,
+  X,
+  Building2,
+  IndianRupee,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +33,7 @@ import {
   syncMasterCourse,
   publishMasterCourseToStudents,
   unpublishMasterCourseFromStudents,
+  sellMasterCourseToInstitute,
 } from "../actions";
 
 interface MasterRow {
@@ -63,6 +73,8 @@ export function MasterCourseManager({
   const [promoteId, setPromoteId] = useState<string>("");
   const [targets, setTargets] = useState<Record<string, Set<string>>>({});
   const [studentPrice, setStudentPrice] = useState<Record<string, string>>({});
+  const [sellTo, setSellTo] = useState<Record<string, string>>({});
+  const [sellPrice, setSellPrice] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     name: "",
     tagline: "",
@@ -447,6 +459,78 @@ export function MasterCourseManager({
                     Push to {targets[m.id]?.size ?? 0} selected
                   </Button>
                 </>
+              )}
+
+              {/* Sell to ONE institute (interim B2B invoice) */}
+              {tenants.length > 0 && (
+                <div
+                  className="mt-4 rounded-xl border p-3"
+                  style={{ borderColor: "var(--ed-line)", background: "rgba(0,174,239,0.05)" }}
+                >
+                  <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    <Building2 className="size-3.5" /> Sell to an institute
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={sellTo[m.id] ?? ""}
+                      onValueChange={(v) => v && setSellTo((s) => ({ ...s, [m.id]: v }))}
+                    >
+                      <SelectTrigger className="h-9 w-56 rounded-xl">
+                        <SelectValue placeholder="Choose an institute" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tenants.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center gap-1">
+                      <IndianRupee className="size-3.5 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        min={1}
+                        value={sellPrice[m.id] ?? ""}
+                        onChange={(e) =>
+                          setSellPrice((p) => ({ ...p, [m.id]: e.target.value }))
+                        }
+                        placeholder="Price"
+                        disabled={!writable}
+                        className="h-9 w-32 rounded-xl"
+                      />
+                    </div>
+                    <Button
+                      disabled={
+                        !writable || pending || !sellTo[m.id] || !sellPrice[m.id]
+                      }
+                      onClick={() =>
+                        run(
+                          () =>
+                            sellMasterCourseToInstitute({
+                              masterId: m.id,
+                              tenantId: sellTo[m.id],
+                              priceRupees: sellPrice[m.id],
+                            }),
+                          "Sold — invoice recorded (pending until paid)",
+                        )
+                      }
+                      className="h-9 rounded-xl"
+                    >
+                      {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Building2 className="size-4" />
+                      )}
+                      Sell
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Assigns the course to the institute now and records a pending
+                    invoice (settle it in the Institute invoices list, or
+                    automatically once Stripe is connected).
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
