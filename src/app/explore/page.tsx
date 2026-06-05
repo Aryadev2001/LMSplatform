@@ -203,24 +203,6 @@ export default async function ExplorePage({
       </section>
 
       <section className="mx-auto max-w-7xl px-6 py-10">
-        {/* Category chips */}
-        <div className="mb-8 flex flex-wrap gap-2">
-          {EURO_CATEGORIES.map((c) => (
-            <a
-              key={c.slug}
-              href={`/explore?category=${c.slug}`}
-              className="rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors"
-              style={{
-                borderColor: "var(--ed-line)",
-                background: sp.category === c.slug ? "var(--ed-ink)" : "white",
-                color: sp.category === c.slug ? "white" : "var(--ed-ink-2)",
-              }}
-            >
-              {c.label}
-            </a>
-          ))}
-        </div>
-
         <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
           <ExploreFilters
             totalShown={filtered.length}

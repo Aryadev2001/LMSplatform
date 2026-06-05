@@ -9,7 +9,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "Explore courses", href: "/explore" },
       { label: "Categories", href: "/explore" },
       { label: "Institutes", href: "/explore" },
-      { label: "Certifications", href: "/explore?category=certification" },
+      { label: "Certifications", href: "/explore" },
     ],
   },
   {
