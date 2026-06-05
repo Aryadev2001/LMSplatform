@@ -6,51 +6,35 @@ import { PencilLoader } from "@/components/ui/loader-1";
 
 /**
  * Global page preloader — shows ONLY on a full/initial page load (first paint,
- * hard refresh, or direct URL), then fades out once the page is ready. It does
- * NOT fire on client-side route changes: the root layout persists across those,
- * so this component mounts once per real document load and never re-shows on
- * in-app navigation.
+ * hard refresh, or direct URL), then fades out once the page is INTERACTIVE. It
+ * does NOT fire on client-side route changes: the root layout persists across
+ * those, so this component mounts once per real document load.
  *
- * Self-healing: the initial load waits for `window load` (assets) with a safety
- * cap so it can never hang, plus a minimum visible time so it never flashes.
+ * The overlay is server-rendered (covers the page from first paint) and this
+ * effect runs only after React hydration — i.e. once the page is interactive —
+ * so we just hold it for a short minimum then fade. We deliberately do NOT wait
+ * for `window load`: on content-heavy pages (images, embedded video) that took
+ * ~4s and felt broken. Hiding at interactive keeps it a snappy ~1s.
  */
-const MIN_VISIBLE_MS = 650;
+const MIN_VISIBLE_MS = 600;
 const FADE_MS = 450;
-const SAFETY_MS = 4000;
 
 export function PageLoader() {
   const [show, setShow] = useState(true);
   const [hiding, setHiding] = useState(false);
 
   useEffect(() => {
-    const startedAt = Date.now();
-    let hideTimer: ReturnType<typeof setTimeout> | undefined;
+    // This effect runs post-hydration → the page is interactive. Hold the
+    // overlay for a short branded minimum, then fade out.
     let unmountTimer: ReturnType<typeof setTimeout> | undefined;
-    let safetyTimer: ReturnType<typeof setTimeout> | undefined;
-    let onLoad: (() => void) | null = null;
-
-    const beginHide = () => {
-      const wait = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt));
-      hideTimer = setTimeout(() => {
-        setHiding(true); // start the opacity fade
-        unmountTimer = setTimeout(() => setShow(false), FADE_MS);
-      }, wait);
-    };
-
-    if (typeof document !== "undefined" && document.readyState !== "complete") {
-      // Wait for assets to finish, with a safety cap so we never hang.
-      onLoad = () => beginHide();
-      window.addEventListener("load", onLoad, { once: true });
-      safetyTimer = setTimeout(beginHide, SAFETY_MS);
-    } else {
-      beginHide();
-    }
+    const hideTimer = setTimeout(() => {
+      setHiding(true);
+      unmountTimer = setTimeout(() => setShow(false), FADE_MS);
+    }, MIN_VISIBLE_MS);
 
     return () => {
-      if (hideTimer) clearTimeout(hideTimer);
-      if (unmountTimer) clearTimeout(unmountTimer);
-      if (safetyTimer) clearTimeout(safetyTimer);
-      if (onLoad) window.removeEventListener("load", onLoad);
+      clearTimeout(hideTimer);
+      clearTimeout(unmountTimer);
     };
   }, []);
 
