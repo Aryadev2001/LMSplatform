@@ -1,8 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { Sparkles, PlayCircle, Star, Coins } from "lucide-react";
+import {
+  Sparkles,
+  PlayCircle,
+  Star,
+  Coins,
+  GraduationCap,
+  ArrowRight,
+  CheckCircle2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/format";
 import {
   AI_SERVICES,
   AI_CATEGORIES,
@@ -20,6 +30,16 @@ import {
   type AiService,
   type AiCategory,
 } from "@/lib/ai-services";
+
+export interface CatalogCourse {
+  id: string;
+  name: string;
+  slug: string | null;
+  tagline: string | null;
+  imageUrl: string | null;
+  priceCents: number;
+  currency: string;
+}
 
 const CAT_COLOR: Record<AiCategory, string> = {
   Career: "var(--ed-indigo)",
@@ -35,15 +55,119 @@ function getNow(s: AiService) {
   );
 }
 
-export function AiCatalog({ pointsBalance }: { pointsBalance: number }) {
+export function AiCatalog({
+  pointsBalance,
+  courses = [],
+  enrolledProgramIds = [],
+}: {
+  pointsBalance: number;
+  courses?: CatalogCourse[];
+  enrolledProgramIds?: string[];
+}) {
   const [cat, setCat] = useState<"All" | AiCategory>("All");
   const [preview, setPreview] = useState<AiService | null>(null);
 
   const list =
     cat === "All" ? AI_SERVICES : AI_SERVICES.filter((s) => s.category === cat);
+  const enrolled = new Set(enrolledProgramIds);
 
   return (
     <div>
+      {/* AI Courses — real platform courses, purchasable */}
+      {courses.length > 0 && (
+        <section className="mb-10">
+          <div className="mb-4 flex items-center gap-2">
+            <GraduationCap className="size-5" style={{ color: "var(--ed-green-dark)" }} />
+            <h2 className="text-lg font-bold tracking-tight">AI Courses</h2>
+            <span className="text-xs font-medium text-muted-foreground">by EuroDigital</span>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {courses.map((c) => {
+              const owned = enrolled.has(c.id);
+              const free = c.priceCents === 0;
+              const href = owned
+                ? c.slug
+                  ? `/student/courses/${c.slug}`
+                  : "/student/courses"
+                : c.slug
+                  ? `/courses/${c.slug}`
+                  : "#";
+              const initial = c.name.trim().charAt(0).toUpperCase() || "•";
+              return (
+                <Link
+                  key={c.id}
+                  href={href}
+                  className="group flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+                  style={{ borderColor: "var(--ed-line)" }}
+                >
+                  <div className="relative h-32 overflow-hidden" style={{ background: "var(--ed-gradient)" }}>
+                    {c.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={c.imageUrl}
+                        alt={c.name}
+                        className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <>
+                        <div
+                          aria-hidden
+                          className="pointer-events-none absolute inset-0 opacity-30"
+                          style={{ background: "var(--ed-halftone)" }}
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center text-5xl font-black text-white/90">
+                          {initial}
+                        </span>
+                      </>
+                    )}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/45 to-transparent" />
+                    {owned ? (
+                      <span
+                        className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white"
+                        style={{ background: "var(--ed-green-dark)" }}
+                      >
+                        <CheckCircle2 className="size-3" /> Enrolled
+                      </span>
+                    ) : (
+                      <span
+                        className="absolute right-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold tabular-nums backdrop-blur"
+                        style={
+                          free
+                            ? { background: "var(--ed-green-dark)", color: "white" }
+                            : { background: "rgba(255,255,255,0.92)", color: "var(--ed-ink)" }
+                        }
+                      >
+                        {free ? "Free" : formatCurrency(c.priceCents, c.currency)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-col p-4">
+                    <h3 className="line-clamp-2 text-sm font-extrabold leading-snug">{c.name}</h3>
+                    {c.tagline && (
+                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{c.tagline}</p>
+                    )}
+                    <div
+                      className="mt-auto flex items-center justify-between border-t pt-3"
+                      style={{ borderColor: "var(--ed-line)" }}
+                    >
+                      <span className="text-[11px] font-semibold text-muted-foreground">
+                        {owned ? "In your courses" : free ? "Free" : "One-time"}
+                      </span>
+                      <span
+                        className="inline-flex items-center gap-1 text-xs font-bold transition-transform group-hover:translate-x-0.5"
+                        style={{ color: "var(--ed-blue)" }}
+                      >
+                        {owned ? "Continue" : "View & enroll"}
+                        <ArrowRight className="size-3.5" />
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
       {/* Header */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">

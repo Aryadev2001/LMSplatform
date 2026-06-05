@@ -52,6 +52,9 @@ const liveCourseWhere = and(
   eq(programs.isActive, true),
   isNotNull(programs.approvedAt), // super-admin approval gate
   isNotNull(programs.tenantId),
+  // Platform "AI Catalog" courses are surfaced in the student catalog, not the
+  // public institute marketplace — keep them out of explore/home/featured.
+  eq(programs.studentCatalog, false),
   ne(tenants.status, "SUSPENDED"),
 );
 

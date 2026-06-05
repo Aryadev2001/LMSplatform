@@ -354,6 +354,10 @@ export const programs = pgTable(
       { onDelete: "set null" },
     ),
     tierUnlockEligible: boolean("tier_unlock_eligible").notNull().default(false),
+    // Platform "AI Catalog" course: a master pushed into the EDT platform
+    // tenant + flagged here is shown to EVERY student in their AI Catalog
+    // (purchasable). Kept out of the public institute marketplace listing.
+    studentCatalog: boolean("student_catalog").notNull().default(false),
     // ---- 0013 course extensions ----
     language: courseLanguageEnum("language").notNull().default("en"),
     features: jsonb("features").notNull().default(sql`'[]'::jsonb`),

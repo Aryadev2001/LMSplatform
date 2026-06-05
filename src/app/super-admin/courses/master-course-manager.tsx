@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Sparkles, Upload, RefreshCw } from "lucide-react";
+import { Loader2, Sparkles, Upload, RefreshCw, GraduationCap, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,8 @@ import {
   promoteCourseToMaster,
   pushMasterCourse,
   syncMasterCourse,
+  publishMasterCourseToStudents,
+  unpublishMasterCourseFromStudents,
 } from "../actions";
 
 interface MasterRow {
@@ -30,6 +32,7 @@ interface MasterRow {
   tier: string;
   status: string;
   copies: number;
+  studentPublished?: boolean;
 }
 interface NamedRow {
   id: string;
@@ -59,6 +62,7 @@ export function MasterCourseManager({
   const [pending, startTransition] = useTransition();
   const [promoteId, setPromoteId] = useState<string>("");
   const [targets, setTargets] = useState<Record<string, Set<string>>>({});
+  const [studentPrice, setStudentPrice] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     name: "",
     tagline: "",
@@ -292,9 +296,17 @@ export function MasterCourseManager({
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-sm">{m.name}</CardTitle>
-                <div className="mt-1 flex gap-2">
+                <div className="mt-1 flex flex-wrap gap-2">
                   <Badge variant="outline">{m.tier}</Badge>
                   <Badge variant="secondary">{m.copies} tenant copies</Badge>
+                  {m.studentPublished && (
+                    <Badge
+                      className="border-transparent font-normal text-white"
+                      style={{ background: "var(--ed-green-dark)" }}
+                    >
+                      <GraduationCap className="size-3" /> Live for students
+                    </Badge>
+                  )}
                 </div>
               </div>
               <Button
@@ -310,6 +322,76 @@ export function MasterCourseManager({
               </Button>
             </CardHeader>
             <CardContent>
+              {/* Publish straight to students (AI Catalog) */}
+              <div
+                className="mb-4 rounded-xl border p-3"
+                style={{ borderColor: "var(--ed-line)", background: "rgba(141,198,63,0.06)" }}
+              >
+                <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <GraduationCap className="size-3.5" /> Publish to students (AI Catalog)
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">₹</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={studentPrice[m.id] ?? ""}
+                      onChange={(e) =>
+                        setStudentPrice((p) => ({ ...p, [m.id]: e.target.value }))
+                      }
+                      placeholder="Price (0 = free)"
+                      disabled={!writable}
+                      className="h-9 w-40 rounded-xl"
+                    />
+                  </div>
+                  <Button
+                    disabled={!writable || pending}
+                    onClick={() =>
+                      run(
+                        () =>
+                          publishMasterCourseToStudents({
+                            masterId: m.id,
+                            priceRupees: studentPrice[m.id] || 0,
+                          }),
+                        m.studentPublished
+                          ? "Updated — live in every student's AI Catalog"
+                          : "Published — now in every student's AI Catalog",
+                      )
+                    }
+                    className="h-9 rounded-xl text-white"
+                    style={{ background: "var(--ed-gradient)" }}
+                  >
+                    {pending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <GraduationCap className="size-4" />
+                    )}
+                    {m.studentPublished ? "Update price" : "Publish to students"}
+                  </Button>
+                  {m.studentPublished && (
+                    <Button
+                      variant="outline"
+                      disabled={!writable || pending}
+                      onClick={() =>
+                        run(
+                          () => unpublishMasterCourseFromStudents({ masterId: m.id }),
+                          "Removed from the student catalog",
+                        )
+                      }
+                      className="h-9 rounded-xl"
+                    >
+                      <X className="size-3.5" /> Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Appears in every student&apos;s AI Catalog, purchasable at this
+                  price (test-mode until Stripe is connected). Kept out of the
+                  public institute marketplace.
+                </p>
+              </div>
+
               <div className="mb-3 text-[10px] uppercase tracking-widest text-muted-foreground">
                 Push to tenants
               </div>

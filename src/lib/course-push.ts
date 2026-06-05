@@ -233,6 +233,64 @@ export async function pushMasterToTenant(params: {
   return { copyId: copy.id, synced: false };
 }
 
+/** The platform's own seller tenant. Master courses published to students are
+ *  pushed here so they reuse the normal tenant-course checkout/enrolment rails;
+ *  the EDT tenant is simply the seller of record. */
+const PLATFORM_TENANT_SLUG = "edt";
+
+async function platformTenantId(): Promise<string> {
+  const [edt] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.slug, PLATFORM_TENANT_SLUG))
+    .limit(1);
+  if (!edt) throw new Error("Platform tenant (edt) not found — seed it first.");
+  return edt.id;
+}
+
+/**
+ * Publish a master course directly to STUDENTS. Pushes (or re-syncs) the master
+ * into the EDT platform tenant, then makes that copy a live, priced "AI Catalog"
+ * course shown to every student. Reuses the normal tenant-course rails for
+ * checkout / enrolment / playback — the platform tenant is simply the seller.
+ */
+export async function publishMasterToStudents(params: {
+  masterId: string;
+  priceCents: number;
+  pushedByUserId: string | null;
+}): Promise<{ copyId: string; slug: string | null }> {
+  const tenantId = await platformTenantId();
+  const { copyId } = await pushMasterToTenant({
+    masterId: params.masterId,
+    tenantId,
+    pushedByUserId: params.pushedByUserId,
+  });
+  const [updated] = await db
+    .update(programs)
+    .set({
+      priceCents: params.priceCents,
+      status: "published",
+      approvedAt: new Date(),
+      isActive: true,
+      studentCatalog: true,
+      updatedAt: new Date(),
+    })
+    .where(eq(programs.id, copyId))
+    .returning({ slug: programs.slug });
+  return { copyId, slug: updated?.slug ?? null };
+}
+
+/** Pull a platform course back out of the student AI Catalog (unpublish). */
+export async function unpublishMasterFromStudents(masterId: string): Promise<void> {
+  const tenantId = await platformTenantId();
+  await db
+    .update(programs)
+    .set({ studentCatalog: false, status: "draft", updatedAt: new Date() })
+    .where(
+      and(eq(programs.sourceCourseId, masterId), eq(programs.tenantId, tenantId)),
+    );
+}
+
 /** Re-sync a master into every tenant that already has a copy. */
 export async function syncMasterToAllTenants(params: {
   masterId: string;

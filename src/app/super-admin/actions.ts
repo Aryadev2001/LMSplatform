@@ -12,6 +12,8 @@ import {
   promoteToMaster,
   pushMasterToTenant,
   syncMasterToAllTenants,
+  publishMasterToStudents,
+  unpublishMasterFromStudents,
   createMasterCourse as authorMasterCourse,
 } from "@/lib/course-push";
 import { requireSuper, type SuperRole, CANONICAL_ADMIN } from "@/lib/auth";
@@ -461,6 +463,64 @@ export async function pushMasterCourse(input: unknown): Promise<Result> {
     return { success: false, error: e instanceof Error ? e.message : "Push failed" };
   }
 
+  revalidatePath("/super-admin/courses");
+  return { success: true };
+}
+
+const PublishStudentsSchema = z.object({
+  masterId: z.string().uuid(),
+  priceRupees: z.coerce.number().int().min(0).max(10_000_000),
+});
+
+/** Publish a master course straight to STUDENTS — it appears in every
+ *  student's AI Catalog (purchasable) via the EDT platform tenant. */
+export async function publishMasterCourseToStudents(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role — you cannot publish courses." };
+  }
+  const parsed = PublishStudentsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const actor = await actorUserId(me.userId);
+  try {
+    const { copyId } = await publishMasterToStudents({
+      masterId: parsed.data.masterId,
+      priceCents: parsed.data.priceRupees * 100,
+      pushedByUserId: actor,
+    });
+    await recordAudit({
+      action: "course.publish_students",
+      targetType: "program",
+      targetId: parsed.data.masterId,
+      metadata: { priceRupees: parsed.data.priceRupees, copyId },
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Publish failed" };
+  }
+  revalidatePath("/super-admin/courses");
+  return { success: true };
+}
+
+/** Remove a platform course from the student AI Catalog. */
+export async function unpublishMasterCourseFromStudents(input: unknown): Promise<Result> {
+  const me = await requireSuper();
+  if (!canWrite(me.rawRole as SuperRole)) {
+    return { success: false, error: "Read-only role." };
+  }
+  const parsed = z.object({ masterId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
+  try {
+    await unpublishMasterFromStudents(parsed.data.masterId);
+    await recordAudit({
+      action: "course.unpublish_students",
+      targetType: "program",
+      targetId: parsed.data.masterId,
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed" };
+  }
   revalidatePath("/super-admin/courses");
   return { success: true };
 }

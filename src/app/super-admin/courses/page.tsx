@@ -23,6 +23,7 @@ export default async function SuperCoursesPage() {
       tier: programs.tier,
       status: programs.status,
       copies: sql<number>`(select count(*)::int from ${programs} c where c.source_course_id = ${programs.id})`,
+      studentPublished: sql<boolean>`exists (select 1 from ${programs} c where c.source_course_id = ${programs.id} and c.student_catalog = true)`,
     })
     .from(programs)
     .where(eq(programs.isMasterCourse, true))
