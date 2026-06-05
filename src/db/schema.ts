@@ -370,6 +370,9 @@ export const programs = pgTable(
     uniqueIndex("programs_slug_idx").on(t.slug),
     index("programs_tenant_idx").on(t.tenantId),
     index("programs_source_idx").on(t.sourceCourseId),
+    // Marketplace "live course" filter (status + approval) — keeps explore /
+    // storefront listings off a full programs scan as the catalog grows.
+    index("programs_status_idx").on(t.status),
   ],
 );
 
@@ -660,6 +663,12 @@ export const enrollments = pgTable(
     index("enrollments_email_idx").on(t.email),
     index("enrollments_status_idx").on(t.status),
     uniqueIndex("enrollments_stripe_session_idx").on(t.stripeSessionId),
+    // Hot paths (added for launch scale): the student dashboard reads every
+    // enrollment by userId; admin/analytics join + filter by programId+status;
+    // the course player gates entitlement on (userId, programId).
+    index("enrollments_user_idx").on(t.userId),
+    index("enrollments_program_status_idx").on(t.programId, t.status),
+    index("enrollments_user_program_idx").on(t.userId, t.programId),
   ],
 );
 

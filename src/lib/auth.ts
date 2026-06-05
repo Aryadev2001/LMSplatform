@@ -313,7 +313,13 @@ export async function requireRole(allowed: UserRole | UserRole[]) {
   // Tenant-admin may access student routes within their own tenant (legacy
   // "admin-sees-everything" behavior, scoped by tenant middleware in P7-2).
   const ok = user.role !== null && (allowedList.includes(user.role) || user.role === "admin");
-  if (!ok) redirect("/forbidden");
+  if (!ok) {
+    // A super-admin who lands on a tenant route (e.g. clicks an /admin link)
+    // belongs in the super console, not a dead /forbidden — route them there.
+    const raw = (user.rawRole as string | null) ?? "";
+    if (raw.startsWith("SUPER_")) redirect("/super-admin");
+    redirect("/forbidden");
+  }
   return user;
 }
 

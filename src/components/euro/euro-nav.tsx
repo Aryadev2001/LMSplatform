@@ -33,23 +33,20 @@ export function EuroNav() {
         </Link>
 
         <nav className="ml-2 hidden items-center gap-1 lg:flex">
-          {EURO_CATEGORIES.slice(0, 4).map((c) => (
+          {[
+            { href: "/explore", label: "Explore" },
+            { href: "/for-institutes", label: "For institutes" },
+            { href: "/pricing", label: "Pricing" },
+          ].map((c) => (
             <Link
-              key={c.slug}
-              href={`/explore?category=${c.slug}`}
+              key={c.href}
+              href={c.href}
               className="rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--ed-bg)]"
               style={{ color: "var(--ed-ink-2)" }}
             >
               {c.label}
             </Link>
           ))}
-          <Link
-            href="/pricing"
-            className="rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--ed-bg)]"
-            style={{ color: "var(--ed-ink-2)" }}
-          >
-            Pricing
-          </Link>
         </nav>
 
         <form action="/explore" className="relative ml-auto hidden flex-1 md:block md:max-w-xs">

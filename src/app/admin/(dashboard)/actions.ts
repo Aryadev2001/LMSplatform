@@ -123,10 +123,12 @@ export async function createProgram(input: z.infer<typeof ProgramSchema>): Promi
       certificateTemplateUrl: parsed.data.certificateTemplateUrl || null,
       tenantId,
       slug: makeCourseSlug(parsed.data.name),
-      // Submitted for listing, but NOT publicly visible until a super-admin
-      // approves it (approvedAt stays NULL → storefront/marketplace hide it).
-      // Partner can still toggle isActive=false to withdraw it.
+      // Auto-published: an institute's course goes live on the marketplace the
+      // moment it's created (status published + approvedAt set). Super-admins
+      // retain the ability to unpublish/withdraw it from the console, and the
+      // partner can set isActive=false to take it down themselves.
       status: "published",
+      approvedAt: new Date(),
     })
     .returning({ id: programs.id });
   await recordAudit({

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Star } from "lucide-react";
-import { EuroNav, EURO_CATEGORIES } from "@/components/euro/euro-nav";
+import { EuroNav } from "@/components/euro/euro-nav";
 import { EuroFooter } from "@/components/euro/euro-footer";
 import { EuroCourseCard } from "@/components/euro/course-card";
 import { FloatingHero } from "@/components/euro/floating-hero";
@@ -17,15 +17,6 @@ export const metadata = {
   description:
     "A global learning marketplace. Discover courses from verified institutes, earn verified certificates and rewards.",
 };
-
-const CAT_COLORS = [
-  "var(--ed-blue)",
-  "var(--ed-indigo)",
-  "var(--ed-pink)",
-  "var(--ed-green)",
-  "var(--ed-teal)",
-  "var(--ed-warn)",
-];
 
 export default async function HomePage() {
   const [stats, trending, institutes] = await Promise.all([
@@ -51,33 +42,6 @@ export default async function HomePage() {
         statTiles={statTiles}
         featuredCourses={trending.slice(0, 3)}
       />
-
-      {/* Categories */}
-      <section className="mx-auto max-w-7xl px-6 py-14">
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {EURO_CATEGORIES.map((cat, i) => (
-            <Link
-              key={cat.slug}
-              href={`/explore?category=${cat.slug}`}
-              className="rounded-2xl border bg-white p-5 transition-shadow hover:shadow-md"
-              style={{ borderColor: "var(--ed-line)" }}
-            >
-              <div
-                className="mb-3 flex size-11 items-center justify-center rounded-full"
-                style={{ background: CAT_COLORS[i % CAT_COLORS.length] }}
-              >
-                <cat.icon className="size-5 text-white" />
-              </div>
-              <div className="text-sm font-bold" style={{ color: "var(--ed-ink)" }}>
-                {cat.label}
-              </div>
-              <div className="mt-1 text-xs" style={{ color: "var(--ed-mute)" }}>
-                Explore →
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
 
       {/* Trending */}
       <section className="mx-auto max-w-7xl px-6 pb-14">
