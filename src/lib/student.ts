@@ -18,6 +18,8 @@ export interface StudentCourse {
   name: string;
   slug: string | null;
   tagline: string | null;
+  imageUrl: string | null;
+  instituteName: string | null;
   durationMonths: number;
   totalLessons: number;
   doneLessons: number;
@@ -134,11 +136,14 @@ export const getStudentSnapshot = cache(
           name: programs.name,
           slug: programs.slug,
           tagline: programs.tagline,
+          imageUrl: programs.imageUrl,
+          instituteName: tenants.name,
           durationMonths: programs.durationMonths,
           createdAt: enrollments.createdAt,
         })
         .from(enrollments)
         .innerJoin(programs, eq(enrollments.programId, programs.id))
+        .leftJoin(tenants, eq(programs.tenantId, tenants.id))
         .where(eq(enrollments.userId, me.id)),
       db
         .select({ n: sql<number>`count(*)::int` })
@@ -226,6 +231,8 @@ export const getStudentSnapshot = cache(
         name: r.name,
         slug: r.slug,
         tagline: r.tagline,
+        imageUrl: r.imageUrl,
+        instituteName: r.instituteName,
         durationMonths: r.durationMonths,
         totalLessons: total,
         doneLessons: d,

@@ -15,7 +15,6 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
-import { requireTenantId } from "@/lib/tenant";
 import { getCourseBySlug } from "@/lib/courses";
 import { lessonMediaFor } from "@/lib/lesson-media";
 import { isModuleLocked, moduleUnlockAt } from "@/lib/drip";
@@ -42,14 +41,17 @@ export default async function StudentCourseDeliveryPage({
 }) {
   const { slug } = await params;
   const auth = await requireRole("student");
-  const tenantId = await requireTenantId();
   const [me] = await db.select().from(users).where(eq(users.clerkId, auth.userId)).limit(1);
   if (!me) return null;
 
   const data = await getCourseBySlug(slug);
-  // Cross-tenant course access blocked (acceptance #6): a student can only
-  // open a course inside their own tenant.
-  if (!data || data.course.tenantId !== tenantId) notFound();
+  // Marketplace model: a student may open ANY course they're enrolled in,
+  // regardless of which institute (tenant) published it — entitlement is the
+  // enrollment row below, NOT a tenant match (a learner on the apex routinely
+  // buys Byte School / Physics Wallah / etc. courses). The protected video
+  // stream endpoint independently re-checks enrollment + drip, so a
+  // non-enrolled viewer only ever sees a locked preview here.
+  if (!data) notFound();
   const { course, modules } = data;
 
   const [stu] = await db
