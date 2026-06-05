@@ -42,6 +42,12 @@ export function CoursePlayer({
   const [pending, startTransition] = useTransition();
   const active = flat.find((l) => l.id === activeId);
 
+  const totalLessons = modules.reduce((s, m) => s + m.lessons.length, 0);
+  const totalDone = modules.reduce(
+    (s, m) => s + m.lessons.filter((l) => l.completed).length,
+    0,
+  );
+
   function complete(lessonId: string) {
     startTransition(async () => {
       const r = await markLessonComplete({ lessonId, slug });
@@ -132,54 +138,134 @@ export function CoursePlayer({
 
       {/* Curriculum */}
       <div className="space-y-3">
-        {modules.map((mod, i) => (
-          <div key={mod.id} className="overflow-hidden rounded-2xl bg-card shadow-card">
-            <div className="border-b border-black/5 px-4 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Module {i + 1}
-                </div>
-                {mod.locked && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
-                    <Lock className="size-3" />
-                    {mod.unlockAt
-                      ? `Unlocks ${new Date(mod.unlockAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
-                      : "Locked"}
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-sm font-bold">Course content</h3>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {totalDone}/{totalLessons} done
+          </span>
+        </div>
+
+        {modules.map((mod, i) => {
+          const done = mod.lessons.filter((l) => l.completed).length;
+          const total = mod.lessons.length;
+          const pct = total ? Math.round((done / total) * 100) : 0;
+          const moduleDone = total > 0 && done === total;
+          const hasActive = mod.lessons.some((l) => l.id === activeId);
+
+          return (
+            <div
+              key={mod.id}
+              className="overflow-hidden rounded-2xl border bg-card transition-shadow duration-300"
+              style={
+                hasActive
+                  ? {
+                      borderColor: "rgba(26,173,224,0.35)",
+                      boxShadow:
+                        "0 0 0 1px rgba(26,173,224,0.18), 0 16px 42px -20px rgba(26,173,224,0.55)",
+                    }
+                  : { borderColor: "rgba(0,0,0,0.06)" }
+              }
+            >
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className="text-[10px] font-extrabold uppercase tracking-widest"
+                    style={{
+                      backgroundImage: "linear-gradient(90deg,#8CC63F,#1AADE0)",
+                      WebkitBackgroundClip: "text",
+                      backgroundClip: "text",
+                      color: "transparent",
+                    }}
+                  >
+                    Module {i + 1}
                   </span>
+                  {mod.locked ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+                      <Lock className="size-3" />
+                      {mod.unlockAt
+                        ? `Unlocks ${new Date(mod.unlockAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                        : "Locked"}
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+                      style={
+                        moduleDone
+                          ? { background: "rgba(141,198,63,0.16)", color: "#5f8f1f" }
+                          : { background: "rgba(0,0,0,0.05)", color: "#64748b" }
+                      }
+                    >
+                      {moduleDone && <CheckCircle2 className="size-3" />}
+                      {done}/{total}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-sm font-bold leading-snug">{mod.title}</div>
+                {!mod.locked && total > 0 && (
+                  <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${pct}%`,
+                        background: "linear-gradient(90deg,#8CC63F,#1AADE0)",
+                      }}
+                    />
+                  </div>
                 )}
               </div>
-              <div className="text-sm font-semibold">{mod.title}</div>
+
+              <ul className="border-t border-black/5">
+                {mod.lessons.map((l) => {
+                  const isActive = activeId === l.id;
+                  return (
+                    <li key={l.id}>
+                      <button
+                        type="button"
+                        disabled={mod.locked}
+                        onClick={() => !mod.locked && setActiveId(l.id)}
+                        className={`relative flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-all duration-200 ${
+                          mod.locked
+                            ? "cursor-not-allowed opacity-55"
+                            : "hover:bg-secondary/50"
+                        } ${isActive ? "font-semibold" : ""}`}
+                        style={
+                          isActive
+                            ? {
+                                background:
+                                  "linear-gradient(90deg, rgba(141,198,63,0.13) 0%, rgba(26,173,224,0.13) 100%)",
+                                boxShadow: "inset 0 0 0 1px rgba(26,173,224,0.25)",
+                              }
+                            : undefined
+                        }
+                      >
+                        {isActive && (
+                          <span
+                            aria-hidden
+                            className="absolute inset-y-2 left-0 w-1 rounded-r-full"
+                            style={{ background: "linear-gradient(180deg,#8CC63F,#1AADE0)" }}
+                          />
+                        )}
+                        {mod.locked ? (
+                          <Lock className="size-4 shrink-0 text-muted-foreground" />
+                        ) : l.completed ? (
+                          <CheckCircle2 className="size-4 shrink-0 text-[#8CC63F]" />
+                        ) : isActive ? (
+                          <PlayCircle className="size-4 shrink-0 text-[#1AADE0]" />
+                        ) : (
+                          <Circle className="size-4 shrink-0 text-muted-foreground" />
+                        )}
+                        <span className="flex-1 truncate">{l.title}</span>
+                        <span className="text-[11px] tabular-nums text-muted-foreground">
+                          {Math.round(l.durationSeconds / 60)}m
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-            <ul className="divide-y divide-black/5">
-              {mod.lessons.map((l) => (
-                <li key={l.id}>
-                  <button
-                    type="button"
-                    disabled={mod.locked}
-                    onClick={() => !mod.locked && setActiveId(l.id)}
-                    className={`flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm transition-colors ${
-                      mod.locked
-                        ? "cursor-not-allowed opacity-55"
-                        : "hover:bg-secondary/60"
-                    } ${activeId === l.id ? "bg-secondary/60" : ""}`}
-                  >
-                    {mod.locked ? (
-                      <Lock className="size-4 shrink-0 text-muted-foreground" />
-                    ) : l.completed ? (
-                      <CheckCircle2 className="size-4 shrink-0 text-[#8CC63F]" />
-                    ) : (
-                      <Circle className="size-4 shrink-0 text-muted-foreground" />
-                    )}
-                    <span className="flex-1 truncate">{l.title}</span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {Math.round(l.durationSeconds / 60)}m
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
