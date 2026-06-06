@@ -151,6 +151,11 @@ export function CoursePlayer({
           const pct = total ? Math.round((done / total) * 100) : 0;
           const moduleDone = total > 0 && done === total;
           const hasActive = mod.lessons.some((l) => l.id === activeId);
+          // Clicking anywhere on the module header opens its first unfinished
+          // lesson (or its first lesson) — so the whole box is clickable, not
+          // just the lesson row.
+          const headerTarget =
+            mod.lessons.find((l) => !l.completed) ?? mod.lessons[0];
 
           return (
             <div
@@ -166,7 +171,14 @@ export function CoursePlayer({
                   : { borderColor: "rgba(0,0,0,0.06)" }
               }
             >
-              <div className="px-4 py-3">
+              <button
+                type="button"
+                disabled={mod.locked || !headerTarget}
+                onClick={() => headerTarget && setActiveId(headerTarget.id)}
+                className={`block w-full px-4 py-3 text-left transition-colors ${
+                  mod.locked ? "cursor-not-allowed" : "hover:bg-secondary/40"
+                }`}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <span
                     className="text-[10px] font-extrabold uppercase tracking-widest"
@@ -212,7 +224,7 @@ export function CoursePlayer({
                     />
                   </div>
                 )}
-              </div>
+              </button>
 
               <ul className="border-t border-black/5">
                 {mod.lessons.map((l) => {
