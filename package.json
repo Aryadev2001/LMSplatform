@@ -11,7 +11,11 @@
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
-    "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts"
+    "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
+    "smoke:db": "dotenv -e .env.local -- tsx scripts/smoke-db.ts",
+    "smoke:http": "tsx scripts/smoke-http.ts",
+    "smoke:ui": "node scripts/diag-overlays.mjs",
+    "smoke": "npm run smoke:http && npm run smoke:db"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
